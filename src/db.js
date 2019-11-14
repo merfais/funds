@@ -9,24 +9,43 @@ function selectFundList() {
 }
 
 // 数据库基金列表插入
-function insertFund(data) {
-  const sql = 'insert into fund_info set ?'
-  return insert(sql, data)
+const cache = {}
+function insertThroughCache(table, data) {
+  if (!cache[table]) {
+    cache[table] = data
+  } else {
+    cache[table] = cache[table].concat(data)
+  }
+  let handler = Promise.resolve()
+  if (cache[table].length >= 200) {
+    data = cache[table]
+    cache[table] = []
+    handler = db.insert(table, data)
+  }
+  return handler
 }
 
-function insertDailyValue(data) {
-  const sql = 'insert into fund_daily_state set ?'
-  return insert(sql, data)
-}
-
-// 数据库基金列表更新
-function updateFund(data) {
-  const data = { ...data }
-  const id = data.id
-  delete data.id
-  const query = knex(table.fund_info).update(data).where({ id })
-  return query.then(d => d)
+function insertFundList(data) {
+  return insertThroughCache('fund_info', data)
 }
 
 
+function insertDailyState(data) {
+  return insertThroughCache('fund_daily_state')
+}
 
+function flushCache() {
+  _.forEach(cache, (data, table) => {
+    if (data.length) {
+      db.insert(table, data)
+      cache[table] = []
+    }
+  })
+}
+
+module.exports = {
+  selectFundList,
+  insertFundList,
+  insertDailyState,
+  flushCache,
+}
