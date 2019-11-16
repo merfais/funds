@@ -3,12 +3,13 @@ const util = require('util')
 const log4js = require('log4js')
 const dateformat = require('date-format');
 const _ = require('lodash')
+const chalk = require('chalk')
 
 log4js.configure({
   appenders: {
     file: {
       type: 'dateFile',
-      filename: path.resolve(__dirname, '../logs/fund.log'),
+      filename: path.resolve(__dirname, '../../logs/fund.log'),
       compress: true,
       daysToKeep: 60,
       layout: {
@@ -26,43 +27,50 @@ log4js.configure({
 })
 
 
-const keys = [
-  'all',
-  'trace',
-  'debug',
-  'info',
-  'warn',
-  'error',
-  'fatal',
-  'mark',
-  'off'
-]
+const keys = {
+  all: 'grey',
+  trace: 'blue',
+  debug: 'cyan',
+  info: 'green',
+  warn: 'yellow',
+  error: 'red',
+  fatal: 'magenta',
+  mark: 'grey',
+  off: 'grey',
+}
 
 const fileLogger = log4js.getLogger()
+const consoleLogger = (level, color, ...args) => {
+  // console logger 使用自定义的输出
+  let format = args[0]
+  let output
+  if (/%[sdifjoOc%]/.test(format)) {
+    // 带format参数
+    output = util.formatWithOptions({ colors: true }, ...args)
+  } else {
+    // 未带format对特定的类型做格式化
+    format = _.map(args, arg => {
+      if (_.isNumber(arg)) {
+        return '%d'
+      } else if (_.isInteger(arg)) {
+        return '%f'
+      } else if (_.isObject(arg)) {
+        return '%O'
+      }
+      return '%s'
+    }).join(' ')
+    output = util.formatWithOptions({ colors: true }, format, ...args)
+  }
+  const date = dateformat('yyyy-MM-dd hh:mm:ss.SSS', new Date())
+  const prefix = chalk[color](`[${date}][${level.toUpperCase()}] -`)
+  console.log(prefix, output)
+}
 
-_.forEach(keys, func => {
-  module.exports[func] = (...args) => {
-    fileLogger[func].apply(fileLogger, args)
-    // console logger 使用自定义的输出
-    let format = args[0]
-    if (/%[sdifjoOc%]/.test(format)) {
-      // 带format参数
-      args = util.formatWithOptions({ colors: true }, ...args)
-    } else {
-      // 未带format对特定的类型做格式化
-      format = _.map(args, arg => {
-        if (_.isNumber(arg)) {
-          return '%d'
-        } else if (_.isInteger(arg)) {
-          return '%f'
-        } else if (_.isObject(arg)) {
-          return '%O'
-        }
-        return '%s'
-      }).join(' ')
-      args = util.formatWithOptions({ colors: true }, format, ...args)
-    }
-    const date = dateformat('yyyy-MM-dd hh:mm:ss.SSS', new Date())
-    console.log(`[${date}][${func.toUpperCase()}]-`, args)
+module.exports.log = (...args) => consoleLogger('log', 'whiteBright', ...args)
+
+_.forEach(keys, (color, level) => {
+  module.exports[level] = (...args) => {
+    fileLogger[level].apply(fileLogger, args)
+    consoleLogger(level, color, ...args)
   }
 })

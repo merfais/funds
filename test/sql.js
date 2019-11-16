@@ -1,6 +1,6 @@
 const mysql = require('mysql2')
 const _ = require('lodash')
-const db = require('./src/utils/db.js')
+const db = require('../src/utils/db.js')
 
 const arr = [{
   name: 'xiaoming',

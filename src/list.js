@@ -1,120 +1,34 @@
 const _ = require('lodash')
-const date = require('date-fns')
-const knex = require('./sql')
+const chalk = require('chalk')
+const dateformat = require('date-format');
+const {
+  selectFundList,
+  insertFundList,
+  insertDailyState,
+  flushCache,
+} = require('./db')
 const {
   request,
   randomReqest,
-} = require('./request.js')
+  logger,
+} = require('./utils')
+const {
+  genFundDetailOptions,
+  genFundDailyValueOptions,
+  genAllFundOptions,
+} = require('./options')
+const exception = require('./exception')
 
-const table = {
-  fund_info: 'fund_info',
-}
-
-
-// var db = {
-//   chars: ['a', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'm', 'n', 'p', 'q', 'r', 's', 't', 'w', 'x', 'y', 'z'],
-//   datas: [[
-//     '000001',
-//     '华夏成长'
-//     'HXCZ',
-//     '1.1210',
-//     '3.5320',
-//     '1.1270',
-//     '3.5380',
-//     '-0.0060',
-//     '-0.53',
-//     '开放申购',
-//     '开放赎回',
-//     '',
-//     '1',
-//     '0',
-//     '1',
-//     '',
-//     '1',
-//     '0.15%',
-//     '0.15%',
-//     '1',
-//     '1.50%'
-//   ]],
-//   count: ['5071', '1517', '751', '2803'],
-//   record: '5876',
-//   pages: '5876',
-//   curpage: '1',
-//   indexsy: [-0.99, -0.87, 0.2],
-//   showday: ['2018-02-28', '2018-02-27']
-// }
-// 查询所有基金
-const listReqConf = (page, size = 200) => ({
-  method: 'get',
-  baseURL: 'http://fund.eastmoney.com',
-  url: '/Data/Fund_JJJZ_Data.aspx',
-  params: {
-    t: 1,
-    lx: 1,
-    letter: '',
-    gsid: '',
-    text: '',
-    sort: 'bzdm,asc',   // bzdm: 基金代码 zdf: 日增长 降序
-    page: `${page},${size}`,        // 第1页 200条
-    dt: Date.now(),   // 请求时间戳
-    atfc: '',
-    onlySale: '0',        // 是否可购买 1: 可购 0: 全部
-  },
-  data: {},
-  headers: {
-    Referer: 'http://fund.eastmoney.com/fund.html',
-    Host: 'fund.eastmoney.com',
-  }
-})
-
-// 查询基金详细信息
-const searchReqConf = (key) => ({
-  method: 'get',
-  baseURL: 'http://fundsuggest.eastmoney.com',
-  url: '/FundSearch/api/FundSearchAPI.ashx',
-  params: {
-    callback: 'jQuery18302567309292453006_1550157024546',
-    m: 1,
-    key,
-    _: Date.now()
-  },
-  data: {},
-  headers: {
-    Referer: 'http://fund.eastmoney.com/HH_jzzzl.html',
-    Host: 'fundsuggest.eastmoney.com',
-  }
-})
-
-
-// 取数据库中基金列表
-function selectFund() {
-  const query = knex.select().from(table.fund_info)
-  return query.then(d => d)
-}
-
-// 数据库基金列表插入
-function insertFund(data) {
-  const query = knex.insert(data).into(table.fund_info)
-  return query.then(d => d)
-}
-
-// 数据库基金列表更新
-function updateFund(data) {
-  const data = { ...data }
-  const id = data.id
-  delete data.id
-  const query = knex(table.fund_info).update(data).where({ id })
-  return query.then(d => d)
-}
 
 // 抓取一个基金的详细信息
 function getFundDetail(fund, errorList, retryTimes) {
-  const options = searchReqConf(fund.code)
-  console.log('<=== search request', fund.code)
-  return randomReqest()(options).catch(e => {
+  const options = genFundDetailOptions(fund.code)
+  return randomReqest(() => {
+    logger.info(options._sid_, `==> 请求基金(${fund.code})详细信息`)
+  })(options).catch(e => {
     errorList.push(options)
   }).then(ack => {
-    console.log('====> response search', fund.code)
+    logger.info(options._sid_, `<== 响应基金(${fund.code})详细信息`)
     if (ack && ack.data) {
       let data = []
       const rst = ack.data.match(/\((.*)\)/)
@@ -123,8 +37,7 @@ function getFundDetail(fund, errorList, retryTimes) {
           ack = JSON.parse(rst[1])
           data = ack && ack.Datas
         } catch(err) {
-          console.log('search 结果 JSON.parse 出现错误, fund.code=', code)
-          console.log(err)
+          logger.error(options._sid_, `响应基金(${fund.code})详细信息的结果 JSON.parse 出现错误:\n`, err)
           // 出现错误的基金记录下来
           errorList.push(options)
         }
@@ -139,14 +52,14 @@ function getFundDetail(fund, errorList, retryTimes) {
       })
     } else {
       retryTimes += 1
-      console.log('获取基金详情返回结果为空, fund.code=', fund.code)
-      console.log(ack)
-      console.log('进行重试', retryTimes)
+      logger.error(options._sid_, `响应基金(${fund.code})详细信息的结果为空`)
+      logger.error(options._sid_, 'ack=', ack)
+      logger.error(options._sid_, `请求基金(${fund.code})详细信息进行重试`, retryTimes)
       if (retryTimes >= 5) {
-        console.log('获取基金详情重试次用用尽, fund.code=', fund.code)
+        logger.error(options._sid_, `请求基金(${fund.code})详情重试次用用尽`)
         errorList.push(options)
       } else {
-        return req(fund)
+        return getFundDetail(fund, errorList, retryTimes)
       }
     }
   })
@@ -154,24 +67,36 @@ function getFundDetail(fund, errorList, retryTimes) {
 
 // 抓取一组（200个）基金的详细信息
 function getFundDetailMulti(arr) {
+  const sid = `[${Math.random().toString(16).slice(2, 6)}]`
+  const length = arr.length
   return new Promise((resolve) => {
+    logger.info(sid, '===> 批量请求基金详细信息，基金数量：', length)
     let i = 0
     const errors = []
     _.forEach(arr, fund => {
       let retryTimes = 0
       getFundDetail(fund, errors, retryTimes).then(() => {
         i += 1
+        logger.log(sid, `批量请求基金详细信息已有 ${chalk.green(i)} 个请求返回，批量长度是${arr.length}`)
         if (i >= arr.length) {
+          logger.info(sid, '<=== 批量请求基金详细信息全部返回，基金数量：', length)
           resolve({ funds: arr, errors })
         }
       })
     })
   }).then(({ funds, errors }) => {
     // 新增基金信息入库
-    console.log('---开始基金代码写入数据库---', db.curpage)
-    insertFund(funds).then(() => {
-      console.log('---基金代码写入数据库完成---', db.curpage)
+    logger.info(sid, '===> 基金信息写入数据库, 数据长度 = ', funds.length)
+    insertFundList(funds).then(res => {
+      const level = res ? 'info' : 'log'
+      logger[level](sid, '<=== 基金信息写入数据库成功', funds.length)
+    }).catch(err => {
+      logger.error(sid, '<== 基金信息写入数据库失败', funds.length)
     })
+    if (errors.length) {
+      logger.error(sid, '批量请求基金详细信息错误汇总：')
+      logger.error(sid, errors)
+    }
   })
 }
 
@@ -180,10 +105,11 @@ function getFundDetailMulti(arr) {
 function getFundDailyValue(params, errorList, retryTimes) {
   const size = 20
   const { code, start, page, totalCount } = params
-  const options = dailyValueReqConf(code, start, page, size)
-  console.log('===> dailyValue request', code, page, totalCount)
-  return randomReqest(options).then(ack => {
-    console.log('<=== response dailyValue', code, page, totalCount)
+  const options = genFundDailyValueOptions(code, start, page, size)
+  return randomReqest(() => {
+    logger.info(options._sid_, `===> 请求基金每日净值, code = ${code}, page = ${page}, totalCount = ${totalCount}`)
+  })(options).then(ack => {
+    logger.info(options._sid_, `<=== 响应基金每日净值, code = ${code}, page = ${page}, totalCount = ${totalCount}`)
     if (ack && ack.data) {
       const rst = ack.data.match(/\((.*)\)/)
       let list = []
@@ -196,17 +122,17 @@ function getFundDailyValue(params, errorList, retryTimes) {
             totalCount = ack.TotalCount
           }
         } catch(err) {
-          console.log('获取基金每日净值返回值JSON.parse出错, code=', code, 'page=', page)
-          console.log(err)
+          logger.error(options._sid_, `响应基金每日净值返回值JSON.parse出错, code = ${code}, page = ${page}\n`, err)
           params.totalCount = 0
           errorList.push(options)
           return params
         }
       }
       const valArr = []
+      const exceptionState = []
       _.forEach(list, item => {
         if (item.FSRQ !== start) {
-          valArr.push({
+          const state = {
             fund_code: code,
             date: item.FSRQ,
             value: item.DWJZ,
@@ -215,13 +141,36 @@ function getFundDailyValue(params, errorList, retryTimes) {
             bonus_des: item.FHSP,
             redemption: item.SHZT,
             purchase: item.SGZT,
-            increase_rate: item.JZZZL,
-          })
+            increase_rate: item.JZZZL || '0.00',
+          }
+          let hasException = null
+          if ((!state.value && state.value !== 0)
+            || (!state.total_value && state.total_value !== 0)
+            || (!state.increase_rate && state.increase_rate !== 0)
+            || !state.purchase
+            || !state.redemption
+          ) {
+            const tmp = Object.assign({}, state)
+            exceptionState.push(tmp)
+            logger.error('基金净值返回值异常：', tmp, item)
+            state.value = state.value || '0.00'
+            state.total_value = state.total_value || '0.00'
+            state.increase_rate = state.increase_rate || '0.00'
+            state.purchase = state.purchase || ''
+            state.redemption = state.redemption || ''
+          }
+          valArr.push(state)
         }
       })
-      console.log('----开始基金净值写入数据库---', code)
-      insertFundValue(valArr).then(() => {
-        console.log('----基金净值写入数据库完成---', code)
+      if (exceptionState.length) {
+        exception.saveFundDailyState(exceptionState)
+      }
+      logger.info(options._sid_, `===> 基金${code}净值写入数据库, 数据长度 =`, valArr.length)
+      insertDailyState(valArr).then(res => {
+        const level = res ? 'info' : 'log'
+        logger[level](options._sid_, `<=== 基金${code}净值写入数据库成功`, valArr.length)
+      }).catch(err => {
+        logger.error(options._sid_, `<=== 基金${code}净值写入数据库失败`, valArr.length)
       })
       if (totalCount > page * size) {
         params.page += 1
@@ -231,11 +180,12 @@ function getFundDailyValue(params, errorList, retryTimes) {
       }
       return params
     } else {
-      console.log('获取基金每日净值返回值为空, code=', code, 'page=', page)
-      console.log(err)
       retryTimes += 1
+      logger.error(options._sid_, `<=== 响应基金每日净值返回值为空, code = ${code}, page = ${page}, totalCount = ${totalCount}`)
+      logger.error(options._sid_, 'ack=', ack)
+      logger.error(options._sid_, `<=== 请求基金每日净值进行重试 ${retryTimes}, code = ${code}, page = ${page}, totalCount = ${totalCount}`)
       if (retryTimes >= 5) {
-        console.log('获取基金每日净值重试次用用尽，code=', code, 'page=', page)
+        logger.error(options._sid_, `<=== 请求基金每日净值重试次数用尽, code = ${code}, page = ${page}, totalCount = ${totalCount}`)
         errorList.push(options)
         params.totalCount = 0
         return params
@@ -246,14 +196,17 @@ function getFundDailyValue(params, errorList, retryTimes) {
   })
 }
 
+let reqQueue = []
 // 抓取一组（200个）基金的每日净值
 function getFundDailyValueMulti(arr) {
+  const sid = `[${Math.random().toString(16).slice(2, 6)}]`
+  const length = arr.length
   return new Promise((resolve) => {
+    logger.info(sid, '===> 批量请求基金每日净值，基金数量：', length)
     let i = 0
     const errors = []
     const next = []
     _.forEach(arr, item => {
-      // TODO:
       const params = {
         code: item.code,
         start: item.start || item.value_updated_at,
@@ -268,12 +221,19 @@ function getFundDailyValueMulti(arr) {
           next.push(res)
         }
         i += 1
+        logger.log(sid, `批量请求基金每日净值已有 ${chalk.green(i)} 个请求返回，批量长度是${arr.length}`)
         if (i >= arr.length) {
+          if (errors.length) {
+            logger.error(sid, '批量请求基金每日净值错误汇总：')
+            logger.error(sid, errors)
+          }
+          logger.info(sid, '<=== 批量请求基金每日净值全部返回，基金数量：', length)
           resolve(next)
         }
       })
     })
   }).then(next => {
+    logger.info(sid, `批量请求基金每日净值本轮数量: ${length}, 剩余${next.length}进入下一轮`)
     if (next.length) {
       reqQueue.push({
         type: 'dailyValue',
@@ -284,24 +244,28 @@ function getFundDailyValueMulti(arr) {
 }
 
 let isFetching = false
-let reqQueue = []
 function flushQueue() {
+  logger.info(`队列调度，此时队列长度${reqQueue.length}`)
   if (isFetching) {
+    logger.info('队列任务繁忙，返回')
     return
   }
   isFetching = true
   if (reqQueue.length) {
     let handler
-    if (reqQueue[0].type === 'detail') {
-      handler = getFundDetailMulti(reqQueue[0].list)
+    logger.info('队首出队，剩余队列长度:', reqQueue.length - 1)
+    const top = reqQueue.shift()
+    if (top.type === 'detail') {
+      handler = getFundDetailMulti(top.list)
     } else {
-      handler = getFundDailyValueMulti(reqQueue[0].list)
+      handler = getFundDailyValueMulti(top.list)
     }
     handler.then(() => {
       isFetching = false
       flushQueue()
     })
   } else {
+    logger.info('队列已经清空')
     isFetching = false
   }
 }
@@ -316,7 +280,7 @@ const fundInfo = {
 // 解析基金列表数据
 // 返回未入库的基金信息
 function parseData(data, map) {
-  const updated_at = date.format(new Date(), 'YYYY-MM-DD')
+  const updated_at = dateformat('yyyy-MM-dd', new Date())
   return _.reduce(data, (rst, item) => {
     const code = item[fundInfo.code]
     if (!map.has(code)) {
@@ -342,45 +306,59 @@ function parseData(data, map) {
 // 抓取基金列表
 // 1、对已经入库的基金（TODO: 更新）
 //    对未入库的基金（新增）入库
-let fundTotalPage = 0
-function getAllFund(page, map, retryTimes) {
+let fundTotalPage = -1
+function getAllFund(page, map, retryTimes, errorList) {
   const size = 200
-  const options = listReqConf(page, size)
-  console.log('===> getAllFund request', page)
-  return randomReqest()(options).then(ack => {
+  const options = genAllFundOptions(page, size)
+  let timeout = 5000
+  if (fundTotalPage === -1) {
+    timeout = 0
+    fundTotalPage = 0
+  }
+  return randomReqest(timeout, () => {
+    logger.info(options._sid_, `===> 请求基金列表, page = ${page}, total = ${fundTotalPage}`)
+  })(options).then(ack => {
     if (ack && ack.data) {
-      eval(ack.data)
-      console.log('<=== response getAllFund :', db.curpage, db.pages)
-      const data = db.datas || []
-      fundTotalPage = db.pages
-      const rst = parseData(data, map)
-      let sequence = Promise.resolve()
-      // 对未入库的基金，抓取详细信息，然后入基金列表库
-      if (rst.insert.length) {
-        reqQueue.push({
-          type: 'detail',
-          list: rst.insert,
-        })
-      }
-      // 对于所有基金，抓取每日基金净值信息，入库
-      if (rst.list.length) {
-        reqQueue.push({
-          type: 'dailyValue',
-          list: rst.list,
-        })
+      try {
+        eval(ack.data) // eval后会曲线db这个变量
+        logger.info(options._sid_, `<=== 响应基金列表, page = ${db.curpage}, total = ${db.pages}`)
+        const data = db.datas || []
+        fundTotalPage = db.pages
+        const rst = parseData(data, map)
+        // 对未入库的基金，抓取详细信息，然后入基金列表库
+        if (rst.insert.length) {
+          logger.info(options._sid_, `新增基金${rst.insert.length}个进入更新详细信息队列`)
+          reqQueue.push({
+            type: 'detail',
+            list: rst.insert,
+          })
+        }
+        // 对于所有基金，抓取每日基金净值信息，入库
+        if (rst.list.length) {
+          logger.info(options._sid_, `${rst.list.length}个基金进入更新净值队列`)
+          reqQueue.push({
+            type: 'dailyValue',
+            list: rst.list,
+          })
+        }
+      } catch (e) {
+        logger.error(options._sid_, `<=== 响应基金列表返回值解析出错, page = ${page}, total = ${fundTotalPage}`)
+        logger.error(options._sid_, e)
+        errorList.push(options)
       }
       flushQueue()
       return fundTotalPage
     } else {
-      console.log('获取基金列表返回值为空, page=', page, 'size=', size)
-      console.log(ack)
-      console.log('进行重试', retryTimes)
       retryTimes += 1
+      logger.error(options._sid_, `<=== 响应基金列表返回值为空, page = ${page}, total = ${fundTotalPage}`)
+      logger.error(options._sid_, 'ack=', ack)
+      logger.error(options._sid_, `<=== 请求基金列表进行重试 ${retryTimes}, page = ${page}, total = ${fundTotalPage}`)
       if (retryTimes >= 5) {
-        console.log('获取基金列表重试次数用尽, page=', page, 'size=', size)
+        logger.error(options._sid_, `<=== 请求基金列表重试次数用尽, page = ${page}, total = ${fundTotalPage}`)
+        errorList.push(options)
         return 0
       } else {
-        return getAllFund(page, map, retryTimes)
+        return getAllFund(page, map, retryTimes, errorList)
       }
     }
   })
@@ -389,17 +367,30 @@ function getAllFund(page, map, retryTimes) {
 // 读取数据库基金列表存入map
 // 开启抓取队列
 function fetchFundData() {
-  const rst = {}
-  selectFund().then(res => {
+  const sid = `[${Math.random().toString(16).slice(2, 6)}]`
+  selectFundList().then(res => {
     const map = new Map()
     _.forEach(res, item => {
       map.set(item.code, item.value_updated_at)
     })
+    logger.info(sid, '------------------开始请求基金列表---------------------')
     const retryTimes = 0
-    getAllFund(1, map, retryTimes).then(totalPage => {
-      let i = 2;
+    const errors = []
+    getAllFund(1, map, retryTimes, errors).then(totalPage => {
+      logger.info(sid, '请求基金列表第一次返回，totalPage =', totalPage)
+      logger.info(sid, '启动批量请求基金列表')
+      let i = 2
+      let j = 0
+      totalPage = 3   // FIXME: 测试删除
       while (i <= totalPage) {
-        getAllFund(i, map, retryTimes)
+        getAllFund(i, map, retryTimes, errors).then(() => {
+          j += 1
+          logger.info(sid, `批量请求基金列表已有 ${chalk.green(j)} 个请求返回，批量长度是${totalPage - 1}`)
+          if (j >= totalPage - 1 && errors.length) {
+            logger.error(sid, '批量请求基金列表错误汇总：')
+            logger.error(sid, errors)
+          }
+        })
         i += 1
       }
     })

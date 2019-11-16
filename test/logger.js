@@ -1,0 +1,16 @@
+const chalk = require('chalk')
+const logger = require('../src/utils/logger.js')
+
+logger.log(chalk.red('1111'))
+console.log(chalk.whiteBright('11111'))
+logger.info(chalk.red('1111'))
+console.log(chalk.greenBright('11111'))
+logger.warn(chalk.red('1111'))
+console.log(chalk.yellowBright('11111'))
+logger.error(chalk.red('1111'))
+console.log(chalk.redBright('11111'))
+logger.debug(chalk.red('1111'))
+console.log(chalk.cyanBright('11111'))
+console.log(chalk.white('11111'))
+console.log(chalk.gray('11111'))
+

@@ -1,4 +1,7 @@
-const db = require('./utils/db')
+const {
+  db,
+  logger,
+} = require('./utils')
 
 
 // 取数据库中基金列表
@@ -16,13 +19,16 @@ function insertThroughCache(table, data) {
   } else {
     cache[table] = cache[table].concat(data)
   }
-  let handler = Promise.resolve()
+  logger.log(`本次插入数据长度：${data.length}, 已缓存数据长度：${cache[table].length}`)
   if (cache[table].length >= 200) {
+    logger.info(`清空${table}数据缓存，并开始写入数据库`)
     data = cache[table]
     cache[table] = []
-    handler = db.insert(table, data)
+    return db.insert(table, data)
+  } else {
+    logger.log('缓存数据长度未达到200, 直接返回')
+    return Promise.resolve()
   }
-  return handler
 }
 
 function insertFundList(data) {
@@ -31,7 +37,7 @@ function insertFundList(data) {
 
 
 function insertDailyState(data) {
-  return insertThroughCache('fund_daily_state')
+  return insertThroughCache('fund_daily_state',data)
 }
 
 function flushCache() {

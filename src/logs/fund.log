@@ -1,4 +1,0 @@
-[2019-11-10 17:39:24.687][INFO]-[49b9] insert into `test` (`age`,`name`,`sex`) values (11, 'xiaoming', '男'), (NULL, 'xiaohong', '女'), (12, 'xiaogang', NULL)
-[2019-11-10 17:39:24.699][INFO]-[9726] select `name`,`sex` from `test`
-[2019-11-10 17:39:24.754][INFO]-[9726] test select success 178
-[2019-11-10 17:39:24.760][INFO]-[49b9] test insert success 3
