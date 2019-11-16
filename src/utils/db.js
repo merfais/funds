@@ -20,23 +20,23 @@ function coreExec(typeName) {
     const sid = Math.random().toString(16).slice(2, 6)
     const prefix = `[${sid}] ${tableName} ${typeName}`
     const queryStr = mysql.format(sqlStr, values)
-    logger.info(`[${sid}]`, queryStr)
+    // logger.log(`[${sid}]`, queryStr)
     const start = Date.now()
     return pool.query(sqlStr, values).then(([ result, fields ]) => {
       const end = Date.now()
       const cost = ((end - start) / 1000).toFixed(2) + 'ms'
       if (typeName === 'select') {
         logger.info(prefix, 'success', cost, result && result.length)
-        logger.debug(prefix, 'fields', _.map(fields, item => item.name))
-        logger.debug(prefix, 'result', _.map(result, item => JSON.stringify(item)))
+        logger.log(prefix, 'fields', _.map(fields, item => item.name))
+        logger.log(prefix, 'result', _.map(result, item => JSON.stringify(item)))
       } else if (typeName === 'insert') {
         logger.info(prefix, 'success', cost, result && result.affectedRows)
-        logger.debug(prefix, 'result', result)
+        logger.log(prefix, 'result', result)
         // insert fields = undefined
       }
       return { result, fields }
     }).catch(err => {
-      logger.error(sid, tableName, typeName, ' failed')
+      logger.error(prefix, 'failed, queryStr = \n', queryStr)
       logger.error(err)
       return Promise.reject(err)
     })

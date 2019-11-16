@@ -75,23 +75,23 @@ function getFundDetailMulti(arr) {
     const errors = []
     _.forEach(arr, fund => {
       let retryTimes = 0
-      getFundDetail(fund, errors, retryTimes).then(() => {
+      setTimeout(() => (getFundDetail(fund, errors, retryTimes).then(() => {
         i += 1
         logger.log(sid, `批量请求基金详细信息已有 ${chalk.green(i)} 个请求返回，批量长度是${arr.length}`)
         if (i >= arr.length) {
           logger.info(sid, '<=== 批量请求基金详细信息全部返回，基金数量：', length)
           resolve({ funds: arr, errors })
         }
-      })
+      })))
     })
   }).then(({ funds, errors }) => {
     // 新增基金信息入库
-    logger.info(sid, '===> 基金信息写入数据库, 数据长度 = ', funds.length)
+    logger.info(sid, '基金信息写入数据库, 数据长度 = ', funds.length)
     insertFundList(funds).then(res => {
       const level = res ? 'info' : 'log'
-      logger[level](sid, '<=== 基金信息写入数据库成功', funds.length)
+      logger[level](sid, '基金信息写入数据库成功', funds.length)
     }).catch(err => {
-      logger.error(sid, '<== 基金信息写入数据库失败', funds.length)
+      logger.error(sid, '基金信息写入数据库失败', funds.length)
     })
     if (errors.length) {
       logger.error(sid, '批量请求基金详细信息错误汇总：')
@@ -103,7 +103,7 @@ function getFundDetailMulti(arr) {
 
 // 抓取一个每日基金净值信息
 function getFundDailyValue(params, errorList, retryTimes) {
-  const size = 20
+  const size = 200
   const { code, start, page, totalCount } = params
   const options = genFundDailyValueOptions(code, start, page, size)
   return randomReqest(() => {
@@ -152,7 +152,7 @@ function getFundDailyValue(params, errorList, retryTimes) {
           ) {
             const tmp = Object.assign({}, state)
             exceptionState.push(tmp)
-            logger.error('基金净值返回值异常：', tmp, item)
+            logger.log('基金净值返回值异常：', tmp, item)
             state.value = state.value || '0.00'
             state.total_value = state.total_value || '0.00'
             state.increase_rate = state.increase_rate || '0.00'
@@ -165,12 +165,12 @@ function getFundDailyValue(params, errorList, retryTimes) {
       if (exceptionState.length) {
         exception.saveFundDailyState(exceptionState)
       }
-      logger.info(options._sid_, `===> 基金${code}净值写入数据库, 数据长度 =`, valArr.length)
+      logger.info(options._sid_, `基金${code}净值写入数据库, 数据长度 =`, valArr.length)
       insertDailyState(valArr).then(res => {
         const level = res ? 'info' : 'log'
-        logger[level](options._sid_, `<=== 基金${code}净值写入数据库成功`, valArr.length)
+        logger[level](options._sid_, `基金${code}净值写入数据库成功`, valArr.length)
       }).catch(err => {
-        logger.error(options._sid_, `<=== 基金${code}净值写入数据库失败`, valArr.length)
+        logger.error(options._sid_, `基金${code}净值写入数据库失败`, valArr.length)
       })
       if (totalCount > page * size) {
         params.page += 1
@@ -214,14 +214,18 @@ function getFundDailyValueMulti(arr) {
         retryTimes: item.retryTimes || 0,
         totalCount: item.totalCount || 0,
       }
+      if (params.page === 1) {
+        params.totalCount = -1
+      }
       const retryTimes = 0
       const errors = []
-      getFundDailyValue(params, errors, retryTimes).then(res => {
-        if (res.totalCount) {
-          next.push(res)
-        }
+      setTimeout(() => (getFundDailyValue(params, errors, retryTimes).then(res => {
         i += 1
         logger.log(sid, `批量请求基金每日净值已有 ${chalk.green(i)} 个请求返回，批量长度是${arr.length}`)
+        if (res.totalCount) {
+          logger.log(sid, `基金(${params.code})净值共${res.totalCount}个，当前位于第${params.page - 1}页, 需要进入下一轮`)
+          next.push(res)
+        }
         if (i >= arr.length) {
           if (errors.length) {
             logger.error(sid, '批量请求基金每日净值错误汇总：')
@@ -230,7 +234,7 @@ function getFundDailyValueMulti(arr) {
           logger.info(sid, '<=== 批量请求基金每日净值全部返回，基金数量：', length)
           resolve(next)
         }
-      })
+      })))
     })
   }).then(next => {
     logger.info(sid, `批量请求基金每日净值本轮数量: ${length}, 剩余${next.length}进入下一轮`)

@@ -20,7 +20,7 @@ function insertThroughCache(table, data) {
     cache[table] = cache[table].concat(data)
   }
   logger.log(`本次插入数据长度：${data.length}, 已缓存数据长度：${cache[table].length}`)
-  if (cache[table].length >= 200) {
+  if (cache[table].length >= 500) {
     logger.info(`清空${table}数据缓存，并开始写入数据库`)
     data = cache[table]
     cache[table] = []

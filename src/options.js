@@ -151,7 +151,7 @@ function genFundDetailOptions(key) {
 //   "PageIndex": 1
 // })
 // 查询每日基金净值
-function genFundDailyValueOptions(fundCode, startDate, pageIndex = 1, pageSize = 20) {
+function genFundDailyValueOptions(fundCode, startDate, pageIndex = 1, pageSize = 200) {
   const date = Date.now()
   return {
     _sid_: `[${Math.random().toString(16).slice(2, 6)}]`,
