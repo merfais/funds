@@ -112,9 +112,61 @@ function randomReqest(timeout, before) {
   }
 }
 
+const Q = []        // 队列
+let timer = null    // 队列刷新定时器
+
+function clearQ() {
+  clearInterval(timer)
+  timer = null
+}
+
+let pending = 0   // 正在请求的连接数
+let pendingMax = 100
+function flushQ(piece) {
+  if (pending >= pendingMax) {
+    return
+  }
+  if (Q.length === 0) {
+    clearQ()
+    return
+  }
+  piece = piece || pendingMax - pending + 50
+  const chunk = Q.splice(0, piece)
+  _.forEach(chunk, (item, index) => {
+    if (_.isFunction(item.before)) {
+      item.before()
+    }
+    setTimeout(() => {
+      request(item.options).then(item.resolve).catch(item.reject).then(() => {
+        pending -= 1
+      })
+    }, index)
+  })
+  pending += chunk.length
+}
+
+const timeout = 3000    // 队列刷新时间
+
+function startQ() {
+  flushQ(100)
+  timer = setInterval(flushQ, timeout)
+}
+
+function requestQ(options, before) {
+  return new Promise((resolve, reject) => {
+    Q.push({ options, resolve, reject, before })
+    if (!timer) {
+      startQ()
+    }
+  })
+}
+
 
 module.exports = {
   request,
   randomIP,
   randomReqest,
+  clearQ,
+  startQ,
+  requestQ,
 }

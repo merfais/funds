@@ -1,4 +1,5 @@
 const {
+  requestQ,
   request,
   randomReqest,
 } = require('./request')
@@ -12,6 +13,7 @@ module.exports = {
   db,
   logger,
   request,
+  requestQ,
   randomReqest,
   appendFile,
 }

@@ -75,14 +75,14 @@ function getFundDetailMulti(arr) {
     const errors = []
     _.forEach(arr, fund => {
       let retryTimes = 0
-      setTimeout(() => (getFundDetail(fund, errors, retryTimes).then(() => {
+      getFundDetail(fund, errors, retryTimes).then(() => {
         i += 1
         logger.log(sid, `批量请求基金详细信息已有 ${chalk.green(i)} 个请求返回，批量长度是${arr.length}`)
         if (i >= arr.length) {
           logger.info(sid, '<=== 批量请求基金详细信息全部返回，基金数量：', length)
           resolve({ funds: arr, errors })
         }
-      })))
+      })
     })
   }).then(({ funds, errors }) => {
     // 新增基金信息入库
@@ -219,7 +219,7 @@ function getFundDailyValueMulti(arr) {
       }
       const retryTimes = 0
       const errors = []
-      setTimeout(() => (getFundDailyValue(params, errors, retryTimes).then(res => {
+      getFundDailyValue(params, errors, retryTimes).then(res => {
         i += 1
         logger.log(sid, `批量请求基金每日净值已有 ${chalk.green(i)} 个请求返回，批量长度是${arr.length}`)
         if (res.totalCount) {
@@ -234,7 +234,7 @@ function getFundDailyValueMulti(arr) {
           logger.info(sid, '<=== 批量请求基金每日净值全部返回，基金数量：', length)
           resolve(next)
         }
-      })))
+      })
     })
   }).then(next => {
     logger.info(sid, `批量请求基金每日净值本轮数量: ${length}, 剩余${next.length}进入下一轮`)

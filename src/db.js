@@ -13,6 +13,7 @@ function selectFundList() {
 
 // 数据库基金列表插入
 const cache = {}
+const cacheMax = 400
 function insertThroughCache(table, data) {
   if (!cache[table]) {
     cache[table] = data
@@ -20,13 +21,13 @@ function insertThroughCache(table, data) {
     cache[table] = cache[table].concat(data)
   }
   logger.log(`本次插入数据长度：${data.length}, 已缓存数据长度：${cache[table].length}`)
-  if (cache[table].length >= 500) {
+  if (cache[table].length >= cacheMax) {
     logger.info(`清空${table}数据缓存，并开始写入数据库`)
     data = cache[table]
     cache[table] = []
     return db.insert(table, data)
   } else {
-    logger.log('缓存数据长度未达到200, 直接返回')
+    logger.log(`缓存数据长度未达到${cacheMax}, 直接返回`)
     return Promise.resolve()
   }
 }
@@ -40,7 +41,7 @@ function insertDailyState(data) {
   return insertThroughCache('fund_daily_state',data)
 }
 
-function flushCache() {
+function flushInsertCache() {
   _.forEach(cache, (data, table) => {
     if (data.length) {
       db.insert(table, data)
@@ -49,9 +50,29 @@ function flushCache() {
   })
 }
 
+function updateFundList() {
+  const listTable = 'fund_info'
+  const dailyValueTable = 'fund_daily_state'
+
+  const query = 'UPDATE ?? t1 SET ?? = (SELECT MAX(t2.??) FROM ?? t2 WHERE t1.?? = t2.??)'
+  const data = [
+    'fund_info',
+    'value_updated_at',
+    'date',
+    'fund_daily_state',
+    'code',
+    'code',
+  ]
+
+  const query = 'update fund_info t1,'
+    + '(select code, max(date) date from fund_daily_state group by code) t2'
+    + 'set t1.value_updated_at = t2.date'
+    + 'where t1.code = t2.code'
+}
+
 module.exports = {
   selectFundList,
   insertFundList,
   insertDailyState,
-  flushCache,
+  flushInsertCache,
 }
