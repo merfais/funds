@@ -1,5 +1,6 @@
 const _ = require('lodash')
 const chalk = require('chalk')
+const datefns = require('date-fns')
 const {
   insertDailyState,
 } = require('./db')
@@ -141,10 +142,16 @@ function getFundDailyValueMulti(arr) {
   const sid = `[${Math.random().toString(16).slice(2, 6)}]`
   const length = arr.length
   logger.info(sid, '---> 批量请求基金每日净值，基金数量：', length)
+  const today = datefns.format(new Date(), 'yyyy-MM-dd')
   const errors = []
+  let arrCount = 0
   _.forEach(arr, item => {
     const retryTimes = 0
-    let arrCount = 0
+    if (item.value_updated_at && !datefns.isBefore(new Date(item.value_updated_at), new Date(today))) {
+      arrCount += 1
+      logger.info(`基金${item.code}净值最后更新日期${item.value_updated_at}大于等于今天${today}, 取消请求`)
+      return true
+    }
     getFundDailyValueCount(item, errors, retryTimes).then(totalCount => {
       logger.log(sid, `从${item.value_updated_at}到今天，基金(${item.code})净值共${totalCount}个`)
       let size = 1000

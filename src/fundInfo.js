@@ -1,8 +1,10 @@
 const _ = require('lodash')
 const chalk = require('chalk')
+const datefns = require('date-fns')
 const {
   selectFundList,
   flushCache,
+  updateFundList,
 } = require('./db')
 const {
   requestQ,
@@ -35,7 +37,7 @@ function parseData(data, map) {
       rst.fresh.push(_.reduce(fundInfo, (acc, index, key) => {
         acc[key] = item[index]
         return acc
-      }, { value_updated_at: '1970-01-01' }))
+      }, { value_updated_at: '' }))
     } else {
       rst.old.push({
         code,
@@ -73,6 +75,7 @@ function getAllFund(page, map, retryTimes, errorList) {
         logger.info(options._sid_, `<=== 响应基金列表, page = ${db.curpage}, total = ${db.pages}`)
         fundTotalPage = db.pages
         const rst = parseData(data, map)
+        console.log(rst)
         // 对未入库的基金，抓取详细信息，然后入基金列表库
         if (rst.fresh.length) {
           logger.info(options._sid_, `新增基金${rst.fresh.length}个进入更新详细信息队列`)
@@ -109,11 +112,21 @@ function getAllFund(page, map, retryTimes, errorList) {
 
 function fetchFundData() {
   const sid = `[${Math.random().toString(16).slice(2, 6)}]`
-  selectFundList().then(res => {
-    const map = new Map()
-    _.forEach(res, item => {
-      map.set(item.code, item.value_updated_at)
+  updateFundList().then(() => {
+    return selectFundList().then(res => {
+      const map = new Map()
+      _.forEach(res, item => {
+        if (item.value_updated_at) {
+          let value = new Date(item.value_updated_at)
+          value = datefns.format(datefns.addDays(value, 1), 'yyyy-MM-dd')
+          map.set(item.code, value)
+        } else {
+          map.set(item.code, '')
+        }
+      })
+      return map
     })
+  }).then(map => {
     logger.info(sid, '------------------开始请求基金列表---------------------')
     const retryTimes = 0
     const errors = []

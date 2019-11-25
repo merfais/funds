@@ -27,11 +27,11 @@ function coreExec(typeName) {
       const cost = ((end - start) / 1000).toFixed(2) + 'ms'
       if (typeName === 'select') {
         logger.info(prefix, 'success', cost, result && result.length)
-        logger.log(prefix, 'fields', _.map(fields, item => item.name))
-        logger.log(prefix, 'result', _.map(result, item => JSON.stringify(item)))
+        // logger.log(prefix, 'fields', _.map(fields, item => item.name))
+        // logger.log(prefix, 'result', _.map(result, item => JSON.stringify(item)))
       } else if (typeName === 'insert') {
-        logger.info(prefix, 'success', cost, result && result.affectedRows)
-        logger.log(prefix, 'result', result)
+        logger.info(prefix, 'success', cost, result && result.info)
+        // logger.log(prefix, 'result', result)
         // insert fields = undefined
       }
       return { result, fields }
@@ -101,6 +101,7 @@ function insert(tableName, data) {
 
 
 module.exports = {
+  format: mysql.format,
   pool,
   insert,
   select,

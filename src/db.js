@@ -51,23 +51,31 @@ function flushInsertCache() {
 }
 
 function updateFundList() {
-  const listTable = 'fund_info'
-  const dailyValueTable = 'fund_daily_state'
+  // const sqlStr = 'UPDATE ?? t1 SET ?? = (SELECT MAX(t2.??) FROM ?? t2 WHERE t1.?? = t2.??)'
+  const sqlStr = 'update ?? t1, '
+    + '(select ??, max(??) date from ?? group by ??) t2 '
+    + 'set t1.?? = t2.date '
+    + 'where t1.?? = t2.??'
 
-  const query = 'UPDATE ?? t1 SET ?? = (SELECT MAX(t2.??) FROM ?? t2 WHERE t1.?? = t2.??)'
   const data = [
     'fund_info',
-    'value_updated_at',
+    'code',
     'date',
     'fund_daily_state',
     'code',
+    'value_updated_at',
+    'code',
     'code',
   ]
-
-  const query = 'update fund_info t1,'
-    + '(select code, max(date) date from fund_daily_state group by code) t2'
-    + 'set t1.value_updated_at = t2.date'
-    + 'where t1.code = t2.code'
+  const queryStr = db.format(sqlStr, data)
+  // logger.log(queryStr)
+  logger.info('更新基金净值最后更新日期')
+  return db.pool.query(sqlStr, data).then(([result, rows]) => {
+    logger.info('基金列表更新成功', result.info)
+  }).catch(err => {
+    logger.error('基金列表更新失败', err)
+    logger.info('queryStr = ', queryStr)
+  })
 }
 
 module.exports = {
@@ -75,4 +83,5 @@ module.exports = {
   insertFundList,
   insertDailyState,
   flushInsertCache,
+  updateFundList,
 }

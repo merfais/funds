@@ -1,7 +1,7 @@
 const path = require('path')
 const util = require('util')
 const log4js = require('log4js')
-const dateformat = require('date-format');
+const datefns = require('date-fns')
 const _ = require('lodash')
 const chalk = require('chalk')
 
@@ -61,7 +61,7 @@ const consoleLogger = (level, color, ...args) => {
     }).join(' ')
     output = util.formatWithOptions({ colors: true }, format, ...args)
   }
-  const date = dateformat('yyyy-MM-dd hh:mm:ss.SSS', new Date())
+  const date = datefns.format(new Date(), 'yyyy-MM-dd HH:mm:ss.SSS')
   const prefix = chalk[color](`[${date}][${level.toUpperCase()}] -`)
   console.log(prefix, output)
 }
