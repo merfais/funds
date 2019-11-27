@@ -33,7 +33,7 @@ function insertThroughCache(table, data) {
 }
 
 function insertFundList(data) {
-  return insertThroughCache('fund_info', data)
+  return db.insert('fund_info', data)
 }
 
 
@@ -42,6 +42,7 @@ function insertDailyState(data) {
 }
 
 function flushInsertCache() {
+  logger.info('清空cache写入数据库')
   _.forEach(cache, (data, table) => {
     if (data.length) {
       db.insert(table, data)

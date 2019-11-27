@@ -11,6 +11,12 @@ const {
 const {
   genFundDetailOptions,
 } = require('./options')
+const {
+  getFundDailyValueMulti,
+} = require('./dailyValue')
+const {
+  state
+} = require('./state')
 
 // 抓取一个基金的详细信息
 function getFundDetail(code, errorList, retryTimes) {
@@ -80,8 +86,11 @@ function getFundDetailMulti(funds) {
         logger.info(sid, '<--- 批量请求基金详细信息全部返回，基金数量：', length)
         logger.info(sid, '+++> 基金信息写入数据库, 数据长度 = ', funds.length)
         insertFundList(funds).then(res => {
-          const level = res ? 'info' : 'log'
-          logger[level](sid, '<+++ 基金信息写入数据库成功', funds.length)
+          logger.info(sid, '<+++ 基金信息写入数据库成功', funds.length)
+          logger.info(sid, `${funds.length}个基金开始批量请求基金净值信息`)
+          state.requestFundDetailCount -= 1
+          state.requestFundDailyValueCount += 1
+          getFundDailyValueMulti(funds)
         }).catch(err => {
           logger.error(sid, '<+++ 基金信息写入数据库失败', funds.length)
         })

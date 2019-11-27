@@ -20,6 +20,9 @@ const {
 const {
   getFundDailyValueMulti,
 } = require('./dailyValue')
+const {
+  state
+} = require('./state')
 
 // 基金列表每条数组字段对应值
 const fundInfo = {
@@ -46,8 +49,8 @@ function parseData(data, map) {
     }
     return rst
   }, {
-    fresh: [],   // 需要被插入的基金
-    old: [],     // 所有的基金
+    fresh: [],   // 未入库的基金
+    old: [],     // 已入库的基金
   })
 }
 
@@ -70,20 +73,21 @@ function getAllFund(page, map, retryTimes, errorList) {
   }).then(ack => {
     if (ack && ack.data) {
       try {
-        eval(ack.data) // eval后会曲线db这个变量
+        eval(ack.data) // eval后会出现db这个变量
         const data = db.datas || []
         logger.info(options._sid_, `<=== 响应基金列表, page = ${db.curpage}, total = ${db.pages}`)
         fundTotalPage = db.pages
         const rst = parseData(data, map)
-        console.log(rst)
         // 对未入库的基金，抓取详细信息，然后入基金列表库
         if (rst.fresh.length) {
-          logger.info(options._sid_, `新增基金${rst.fresh.length}个进入更新详细信息队列`)
+          logger.info(options._sid_, `新增基金${rst.fresh.length}个,开始批量请求基金详细信息`)
+          state.requestFundDetailCount += 1
           getFundDetailMulti(rst.fresh)
         }
         // 对于已经入库的基金，抓取每日基金净值信息，入库
         if (rst.old.length) {
-          logger.info(options._sid_, `${rst.old.length}个基金进入更新净值队列`)
+          logger.info(options._sid_, `${rst.old.length}个基金开始批量请求基金净值信息`)
+          state.requestFundDailyValueCount += 1
           getFundDailyValueMulti(rst.old)
         }
       } catch (e) {
@@ -134,17 +138,20 @@ function fetchFundData() {
       logger.info(sid, '请求基金列表第一次返回，totalPage =', totalPage)
       logger.info(sid, '---> 启动批量请求基金列表')
       let i = 2
-      let j = 0
+      let j = 1
       totalPage = 3   // FIXME: 测试删除
       while (i <= totalPage) {
         getAllFund(i, map, retryTimes, errors).then(() => {
-          j += 1
           logger.log(sid, `批量请求基金列表已有 ${chalk.green(j)} 个请求返回，批量长度是${totalPage - 1}`)
           if (j >= totalPage - 1 && errors.length) {
+            state.requestFundListOver = true
             logger.info(sid, `<--- 批量请求基金列表全部返回`)
-            logger.error(sid, '批量请求基金列表错误汇总：')
-            logger.error(sid, errors)
+            if (errors.length) {
+              logger.error(sid, '批量请求基金列表错误汇总：')
+              logger.error(sid, errors)
+            }
           }
+          j += 1
         })
         i += 1
       }

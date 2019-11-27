@@ -3,6 +3,7 @@ const chalk = require('chalk')
 const datefns = require('date-fns')
 const {
   insertDailyState,
+  flushInsertCache,
 } = require('./db')
 const {
   requestQ,
@@ -13,6 +14,9 @@ const {
   genFundDailyValueOptions,
 } = require('./options')
 const exception = require('./exception')
+const {
+  state
+} = require('./state')
 
 // 抓取每日基金净值总数
 function getFundDailyValueCount(fund, errorList, retryTimes) {
@@ -87,10 +91,8 @@ function getFundDailyValue(params, errorList, retryTimes) {
           if ((!value && value !== 0)
             || (!total_value && total_value !== 0)
             || (!increase_rate && increase_rate !== 0)
-            || !purchase
-            || !redemption
           ) {
-            logger.log('基金净值返回值异常：', code, index)
+            logger.warn('基金净值返回值异常：', code, item.FSRQ)
             raw_state = 1
             exceptionState.push({ ...item })
           }
@@ -110,7 +112,7 @@ function getFundDailyValue(params, errorList, retryTimes) {
         }
       })
       if (exceptionState.length) {
-        logger.log(`基金${code}净值返回值异常共${exceptionState.length}个`)
+        logger.warn(`基金${code}净值返回值异常共${exceptionState.length}个`)
         exception.saveFundDailyState(exceptionState)
       }
       logger.info(options._sid_, `+++> 基金${code}净值写入数据库, 数据长度 =`, valArr.length)
@@ -177,6 +179,13 @@ function getFundDailyValueMulti(arr) {
             logger.log(sid, `批量请求基金每日净值已有 ${chalk.green(arrCount)} 个请求返回，批量长度是${length}`)
             if (arrCount >= length) {
               logger.info(sid, '<--- 批量请求基金每日净值全部返回，基金数量：', length)
+              state.requestFundDailyValueCount -= 1
+              if (state.requestFundDailyValueCount <= 0
+                && state.requestFundDetailCount <= 0
+                && state.requestFundListOver
+              ) {
+                flushInsertCache()
+              }
               if (errors.length) {
                 logger.error(sid, '批量请求基金每日净值错误汇总：')
                 logger.error(sid, errors)
