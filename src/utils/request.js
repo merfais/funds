@@ -118,11 +118,13 @@ let timer = null    // 队列刷新定时器
 function clearQ() {
   clearInterval(timer)
   timer = null
+  logger.info(`clearQ: pending = ${pending}, Q.length = ${Q.length}`)
 }
 
 let pending = 0   // 正在请求的连接数
 let pendingMax = 100
 function flushQ(piece) {
+  logger.info(`flushQ: pending = ${pending}, Q.length = ${Q.length}`)
   if (pending >= pendingMax) {
     return
   }
@@ -148,6 +150,7 @@ function flushQ(piece) {
 const timeout = 3000    // 队列刷新时间
 
 function startQ() {
+  logger.info(`startQ: pending = ${pending}, Q.length = ${Q.length}`)
   flushQ(100)
   timer = setInterval(flushQ, timeout)
 }

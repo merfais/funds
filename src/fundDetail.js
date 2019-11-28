@@ -46,6 +46,7 @@ function getFundDetail(code, errorList, retryTimes) {
           data = {
             type_name: info.FTYPE,
             company_id: info.JJGSID,
+            value_updated_at: null,
           }
           return false
         }

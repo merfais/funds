@@ -139,11 +139,11 @@ function fetchFundData() {
       logger.info(sid, '---> 启动批量请求基金列表')
       let i = 2
       let j = 1
-      totalPage = 3   // FIXME: 测试删除
+      // totalPage = 3   // FIXME: 测试删除
       while (i <= totalPage) {
         getAllFund(i, map, retryTimes, errors).then(() => {
           logger.log(sid, `批量请求基金列表已有 ${chalk.green(j)} 个请求返回，批量长度是${totalPage - 1}`)
-          if (j >= totalPage - 1 && errors.length) {
+          if (j >= totalPage - 1) {
             state.requestFundListOver = true
             logger.info(sid, `<--- 批量请求基金列表全部返回`)
             if (errors.length) {
