@@ -21,7 +21,7 @@ const {
 // 抓取一个基金的详细信息
 function getFundDetail(code, errorList, retryTimes) {
   const options = genFundDetailOptions(code)
-  logger.log(options._sid_, `>>>>>> 请求基金(${code})详细信息进入队列`)
+  // logger.log(options._sid_, `>>>>>> 请求基金(${code})详细信息进入队列`)
   return requestQ(options, () => {
     logger.info(options._sid_, `==> 请求基金(${code})详细信息`)
   }).then(ack => {
@@ -82,7 +82,7 @@ function getFundDetailMulti(funds) {
     getFundDetail(fund.code, errors, retryTimes).then(data => {
       Object.assign(fund, data)
       count += 1
-      logger.log(sid, `批量请求基金详细信息已有 ${chalk.green(count)} 个请求返回，批量长度是${funds.length}`)
+      // logger.log(sid, `批量请求基金详细信息已有 ${chalk.green(count)} 个请求返回，批量长度是${funds.length}`)
       if (count >= funds.length) {
         logger.info(sid, '<--- 批量请求基金详细信息全部返回，基金数量：', length)
         logger.info(sid, '+++> 基金信息写入数据库, 数据长度 = ', funds.length)

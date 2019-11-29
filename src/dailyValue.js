@@ -1,3 +1,4 @@
+const util = require('util')
 const _ = require('lodash')
 const chalk = require('chalk')
 const datefns = require('date-fns')
@@ -22,7 +23,7 @@ const {
 function getFundDailyValueCount(fund, errorList, retryTimes) {
   const { code, value_updated_at } = fund
   const options = genFundDailyValueOptions(code, value_updated_at, 10, 1000)
-  logger.info(options._sid_, `>>>>>> 请求基金[${code}]每日净值总数进入队列`)
+  // logger.info(options._sid_, `>>>>>> 请求基金[${code}]每日净值总数进入队列`)
   return requestQ(options, () => {
     logger.info(options._sid_, `===> 请求基金每日净值总数, code = ${code}`)
   }).then(ack => {
@@ -61,7 +62,7 @@ function getFundDailyValueCount(fund, errorList, retryTimes) {
 function getFundDailyValue(params, errorList, retryTimes) {
   const { code, start, page, size } = params
   const options = genFundDailyValueOptions(code, start, page, size)
-  logger.log(options._sid_, `>>>>>> 请求基金[${code}]每日净值进入队列 page = ${page}`)
+  // logger.log(options._sid_, `>>>>>> 请求基金[${code}]每日净值进入队列 page = ${page}`)
   return requestQ(options, () => {
     logger.info(options._sid_, `===> 请求基金每日净值, code = ${code}, page = ${page}`)
   }).then(ack => {
@@ -82,31 +83,30 @@ function getFundDailyValue(params, errorList, retryTimes) {
       const exceptionState = []
       _.forEach(list, (item, index) => {
         if (item.FSRQ !== start) {
-          const value = item.DWJZ
-          const total_value = item.LJJZ
-          const increase_rate = item.JZZZL
-          const purchase = item.SGZT
-          const redemption = item.SHZT
-          let raw_state = 0
-          if ((!value && value !== 0)
-            || (!total_value && total_value !== 0)
-            || (!increase_rate && increase_rate !== 0)
-          ) {
-            logger.warn('基金净值返回值异常：', code, item.FSRQ)
-            raw_state = 1
-            exceptionState.push({ ...item })
-          }
           const state = {
             code: code,
             date: item.FSRQ,
-            value: value || '0.00',
-            total_value: total_value || '0.00',
-            bonus: item.FHFCZ || '0.00',
+            value: item.DWJZ,
+            total_value: item.LJJZ,
+            bonus: item.FHFCZ,
+            increase_rate: item.JZZZL,
             bonus_des: item.FHSP || '',
-            redemption: redemption || '',
-            purchase: purchase || '',
-            increase_rate: increase_rate || '0.00',
-            raw_state,
+            redemption: item.SHZT || '',
+            purchase: item.SGZT || '',
+            raw_state: 0,
+          }
+          if ((!item.DWJZ && item.DWJZ !== 0)
+            || (!item.LJJZ && item.LJJZ !== 0)
+            || (!item.JZZZL && item.JZZZL !== 0)
+            || (!item.FHFCZ && item.FHFCZ !== 0)
+          ) {
+            state.raw_state = 1
+            state.value = state.value || '0.00'
+            state.total_value = state.total_value || '0.00'
+            state.bonus = state.bonus || '0.00'
+            state.increase_rate = state.increase_rate || '0.00'
+            logger.warn('基金净值返回值异常：', code, item.FSRQ)
+            exceptionState.push(util.inspect(state))
           }
           valArr.push(state)
         }
@@ -176,7 +176,7 @@ function getFundDailyValueMulti(arr) {
           count += 1
           if (count >= totalPage) {
             arrCount += 1
-            logger.log(sid, `批量请求基金每日净值已有 ${chalk.green(arrCount)} 个请求返回，批量长度是${length}`)
+            // logger.log(sid, `批量请求基金每日净值已有 ${chalk.green(arrCount)} 个请求返回，批量长度是${length}`)
             if (arrCount >= length) {
               logger.info(sid, '<--- 批量请求基金每日净值全部返回，基金数量：', length)
               state.requestFundDailyValueCount -= 1

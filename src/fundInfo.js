@@ -67,7 +67,7 @@ function getAllFund(page, map, retryTimes, errorList) {
     fundTotalPage = 0
     reqHandler = request
   }
-  logger.log(options._sid_, `>>>>>> 请求基金列表, page = ${page} 进入队列`)
+  // logger.log(options._sid_, `>>>>>> 请求基金列表, page = ${page} 进入队列`)
   return reqHandler(options, () => {
     logger.info(options._sid_, `===> 请求基金列表, page = ${page}`)
   }).then(ack => {

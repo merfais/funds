@@ -77,17 +77,18 @@ function request(options, retryTimes) {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36',
   })
   const method = `[${(options.method || 'GET').toUpperCase()}]`
-  logger.info(options._sid_, method, options.url)
+  // logger.info(options._sid_, method, options.url)
   return axios.request(options).catch(err => {
     logger.error(options._sid_, '网络请求发生错误:\n', err)
     if (retryTimes === 5) {
       logger.error(options._sid_, '网络请求错误重试次数用尽')
       return Promise.reject(err)
     } else {
-      const timeout = Math.random() * 5000
+      const timeout = 1000 + Math.random() * 3000
       logger.error(options._sid_, `网络请求将在${(timeout / 1000).toFixed(3)}s重试`, retryTimes)
       return new Promise((resolve, reject) => {
         setTimeout(() => {
+          logger.info(options._sid_, `网络请求发起重试`)
           request(options, retryTimes + 1).then(resolve).catch(reject)
         }, timeout)
       })
@@ -118,13 +119,13 @@ let timer = null    // 队列刷新定时器
 function clearQ() {
   clearInterval(timer)
   timer = null
-  logger.info(`clearQ: pending = ${pending}, Q.length = ${Q.length}`)
+  logger.info(`############################### clearQ: pending = ${pending}, Q.length = ${Q.length}`)
 }
 
 let pending = 0   // 正在请求的连接数
 let pendingMax = 100
 function flushQ(piece) {
-  logger.info(`flushQ: pending = ${pending}, Q.length = ${Q.length}`)
+  logger.info(`>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> flushQ: pending = ${pending}, Q.length = ${Q.length}`)
   if (pending >= pendingMax) {
     return
   }
@@ -142,7 +143,7 @@ function flushQ(piece) {
       request(item.options).then(item.resolve).catch(item.reject).then(() => {
         pending -= 1
       })
-    }, index)
+    }, index * 5)
   })
   pending += chunk.length
 }
@@ -150,7 +151,7 @@ function flushQ(piece) {
 const timeout = 3000    // 队列刷新时间
 
 function startQ() {
-  logger.info(`startQ: pending = ${pending}, Q.length = ${Q.length}`)
+  logger.info(`@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ startQ: pending = ${pending}, Q.length = ${Q.length}`)
   flushQ(100)
   timer = setInterval(flushQ, timeout)
 }
