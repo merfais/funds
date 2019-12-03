@@ -8,7 +8,10 @@ function appendFile(path, data, withLineBreak) {
   return new Promise((resolve, reject) => {
     const sid = `[${Math.random().toString(16).slice(2, 6)}]`
     logger.info(sid, `===> 写入文件: ${path}`)
-    let str = util.inspect(data)
+    let str = data
+    if (!_.isString(data)) {
+      str = util.inspect(data)
+    }
     if (withLineBreak) {
       str += '\n'
     }

@@ -108,7 +108,7 @@ function randomReqest(timeout, before) {
       if (_.isFunction(before)) {
         before()
       }
-      return request(options)
+      return request(options, 1)
     })
   }
 }
@@ -140,15 +140,15 @@ function flushQ(piece) {
       item.before()
     }
     setTimeout(() => {
-      request(item.options).then(item.resolve).catch(item.reject).then(() => {
+      request(item.options, 1).then(item.resolve).catch(item.reject).then(() => {
         pending -= 1
       })
-    }, index * 5)
+    }, index * 40)
   })
   pending += chunk.length
 }
 
-const timeout = 3000    // 队列刷新时间
+const timeout = 5000    // 队列刷新时间
 
 function startQ() {
   logger.info(`@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ startQ: pending = ${pending}, Q.length = ${Q.length}`)
