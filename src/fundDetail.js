@@ -72,6 +72,7 @@ function getFundDetail(code, errorList, retryTimes) {
 
 // 抓取一组（200个）基金的详细信息
 function getFundDetailMulti(funds) {
+  state.requestFundDetailCount += 1
   const sid = `[${Math.random().toString(16).slice(2, 6)}]`
   const length = funds.length
   logger.info(sid, '---> 批量请求基金详细信息，基金数量：', length)
@@ -90,7 +91,6 @@ function getFundDetailMulti(funds) {
           logger.info(sid, '<+++ 基金信息写入数据库成功', funds.length)
           logger.info(sid, `${funds.length}个基金开始批量请求基金净值信息`)
           state.requestFundDetailCount -= 1
-          state.requestFundDailyValueCount += 1
           getFundDailyValueMulti(funds)
         }).catch(err => {
           logger.error(sid, '<+++ 基金信息写入数据库失败', funds.length)

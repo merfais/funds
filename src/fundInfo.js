@@ -81,13 +81,11 @@ function getAllFund(page, map, retryTimes, errorList) {
         // 对未入库的基金，抓取详细信息，然后入基金列表库
         if (rst.fresh.length) {
           logger.info(options._sid_, `新增基金${rst.fresh.length}个,开始批量请求基金详细信息`)
-          state.requestFundDetailCount += 1
           getFundDetailMulti(rst.fresh)
         }
         // 对于已经入库的基金，抓取每日基金净值信息，入库
         if (rst.old.length) {
           logger.info(options._sid_, `${rst.old.length}个基金开始批量请求基金净值信息`)
-          state.requestFundDailyValueCount += 1
           getFundDailyValueMulti(rst.old)
         }
       } catch (e) {

@@ -52,7 +52,7 @@ function getFundDailyValueCount(fund, errorList, retryTimes) {
       return 0
     } else {
       logger.error(options._sid_, `请求基金每日净值总数进行重试 ${retryTimes}, code = ${code}`)
-      return getFundDailyValue(fund, errorList, retryTimes)
+      return getFundDailyValueCount(fund, errorList, retryTimes)
     }
   })
 }
@@ -63,9 +63,9 @@ function getFundDailyValue(params, errorList, retryTimes) {
   const options = genFundDailyValueOptions(code, start, page, size)
   // logger.log(options._sid_, `>>>>>> 请求基金[${code}]每日净值进入队列 page = ${page}`)
   return requestQ(options, () => {
-    logger.info(options._sid_, `===> 请求基金每日净值, code = ${code}, page = ${page}`)
+    logger.info(options._sid_, `===> 请求基金(${code})每日净值, start=${start}, page=${page}`)
   }).then(ack => {
-    logger.info(options._sid_, `<=== 响应基金每日净值, code = ${code}, page = ${page}`)
+    logger.info(options._sid_, `<=== 响应基金(${code})每日净值, start=${start}, page=${page}`)
     if (ack && ack.data) {
       const rst = ack.data.match(/\((.*)\)/)
       let list = []
@@ -138,17 +138,39 @@ function getFundDailyValue(params, errorList, retryTimes) {
 
 // 抓取一组（200个）基金的每日净值
 function getFundDailyValueMulti(arr) {
+  state.requestFundDailyValueCount += 1
   const sid = `[${Math.random().toString(16).slice(2, 6)}]`
   const length = arr.length
   logger.info(sid, '---> 批量请求基金每日净值，基金数量：', length)
   const today = datefns.format(new Date(), 'yyyy-MM-dd')
   const errors = []
   let arrCount = 0
+
+  function multiReqEnd() {
+    state.requestFundDailyValueCount -= 1
+    logger.info(sid, '<--- 批量请求基金每日净值全部返回，基金数量：', length)
+    logger.info(sid, JSON.stringify(state))
+    if (state.requestFundDailyValueCount <= 0
+      && state.requestFundDetailCount <= 0
+      && state.requestFundListOver
+    ) {
+      flushInsertCache()
+    }
+    if (errors.length) {
+      logger.error(sid, '批量请求基金每日净值错误汇总：')
+      logger.error(sid, errors)
+    }
+  }
+
   _.forEach(arr, item => {
     const retryTimes = 0
     if (item.value_updated_at && datefns.isAfter(new Date(item.value_updated_at), new Date(today))) {
       arrCount += 1
-      logger.info(`基金${item.code}净值最后更新日期${item.value_updated_at}大于今天${today}, 取消请求`)
+      logger.info(sid, `基金${item.code}净值最后更新日期${item.value_updated_at}大于今天${today}, 取消请求, ${arrCount}, ${length}`)
+      // logger.log(sid, `批量请求基金每日净值已有 ${chalk.green(arrCount)} 个请求返回，批量长度是${length}`)
+      if (arrCount >= length) {
+        multiReqEnd()
+      }
       return true
     }
     getFundDailyValueCount(item, errors, retryTimes).then(totalCount => {
@@ -161,6 +183,12 @@ function getFundDailyValueMulti(arr) {
       const totalPage = Math.ceil(totalCount / size)
       let page = 0
       let count = 0
+      if (totalCount === 0) {
+        arrCount += 1
+        if (arrCount >= length) {
+          multiReqEnd()
+        }
+      }
       while (page < totalPage) {
         const params = {
           code: item.code,
@@ -172,20 +200,9 @@ function getFundDailyValueMulti(arr) {
           count += 1
           if (count >= totalPage) {
             arrCount += 1
-            // logger.log(sid, `批量请求基金每日净值已有 ${chalk.green(arrCount)} 个请求返回，批量长度是${length}`)
+            // logger.info(sid, `批量请求基金每日净值已有 ${chalk.green(arrCount)} 个请求返回，批量长度是${length}`)
             if (arrCount >= length) {
-              logger.info(sid, '<--- 批量请求基金每日净值全部返回，基金数量：', length)
-              state.requestFundDailyValueCount -= 1
-              if (state.requestFundDailyValueCount <= 0
-                && state.requestFundDetailCount <= 0
-                && state.requestFundListOver
-              ) {
-                flushInsertCache()
-              }
-              if (errors.length) {
-                logger.error(sid, '批量请求基金每日净值错误汇总：')
-                logger.error(sid, errors)
-              }
+              multiReqEnd()
             }
           }
         })
