@@ -86,7 +86,7 @@ function getFundDailyValue(params, errorList, retryTimes) {
           date: item.FSRQ,
           value: item.DWJZ,
           total_value: item.LJJZ,
-          bonus: item.FHFCZ || '0.00',
+          bonus: item.FHFCZ || 0,
           increase_rate: item.JZZZL,
           bonus_des: item.FHSP || '',
           redemption: item.SHZT || '',
@@ -95,16 +95,18 @@ function getFundDailyValue(params, errorList, retryTimes) {
         }
         if ((!item.DWJZ && item.DWJZ !== 0)
           || (!item.LJJZ && item.LJJZ !== 0)
-          || (!item.JZZZL && item.JZZZL !== 0)
         ) {
-          logger.warn('基金净值返回值异常：', code, item.FSRQ)
-          const tmp = `date:${state.date},value:${state.value},`
-            + `total_value:${state.total_value},increase_rate:${state.increase_rate}`
+          logger.warn('基金净值异常：', code, item.FSRQ)
+          const tmp = `date:${item.FSRQ},value:${item.DWJZ},`
+            + `total_value:${item.LJJZ}`
           exceptionState.push(tmp)
           state.raw_state = 1
-          state.value = state.value || '0.00'
-          state.total_value = state.total_value || '0.00'
-          state.increase_rate = state.increase_rate || '0.00'
+          state.value = item.DWJZ || null
+          state.total_value = item.LJJZ || null
+        }
+        if (!item.JZZZL && item.JZZZL !== 0) {
+          state.increase_rate_raw_state = 1
+          state.increase_rate = null
         }
         valArr.push(state)
       })
