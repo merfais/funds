@@ -52,7 +52,7 @@ const exec = _.reduce([
 }, {})
 
 
-function select(tableName, fields, where) {
+function select(tableName, fields, where, ext) {
   let sqlStr = 'select '
   if (_.isString(fields)) {
     sqlStr += '??'
@@ -65,14 +65,52 @@ function select(tableName, fields, where) {
   }
   sqlStr += ' from ??'
   const arr = fields.concat(tableName)
-  // where and
-  // if (_.isObject(where) && where) {
-  //   sqlStr += ' where ' + _.map(where, (v, k) => {
-  //     arr.push(k)
-  //     arr.push(v)
-  //     return '??=?'
-  //   }).join(' and ')
-  // }
+  // where object === and， array === or
+  if (!_.isEmpty(where)) {
+    sqlStr += 'where '
+    if (_.isArray(where)) { // array使用or连接
+      sqlStr += _.map(where, (v, k) => {
+        if (_.isArray(v)) {
+          // TODO: 1个key多个value使用or连接
+        } else {
+          // 1个key对应1个value
+          arr.push(k)
+          arr.push(v)
+          return '??=?'
+        }
+      }).join(' or ')
+    } else if (_.isPlainObject(where)) {  // Object 使用 and 连接
+      sqlStr += _.map(where, (value, key) => {
+        if (_.isArray(value)) {
+          // TODO: 1个key多个value使用or连接
+          return '(' + _.map(value, v => {
+            arr.push(key)
+            arr.push(v)
+            return '??=?'
+          }).join('or') + ') '
+        } else {
+          // 1个key对应1个value
+          arr.push(key)
+          arr.push(value)
+          return '??=?'
+        }
+      }).join(' and ')
+    }
+  }
+
+  if (ext && ext.orderSort) {
+    let orderSort = _.cloneDeep(ext.orderSort)
+    if (_.isPlainObject(orderSort)) {
+      orderSort = [orderSort]
+    }
+    if (_.isArray(ext.orderSort)) {
+      sqlStr += ' order by '
+      sqlStr += _.map(ext.orderSort, (v, k) => {
+        arr.push(k)
+        return `?? ${v}`
+      }).join(',')
+    }
+  }
   return exec.select(tableName, sqlStr, arr)
 }
 
