@@ -38,6 +38,21 @@ function insertFundList(data) {
 }
 
 
+function selectDailyValue(code, orderSort) {
+  return db.select('fund_daily_state', [
+    'code',
+    'date',
+    'value',
+    'bonus',
+    'bonus_des',
+    'redemption',
+    'purchase',
+    'raw_state',
+  ], { code }, { orderSort }).then(data => {
+    return data.result
+  })
+}
+
 function insertDailyState(data) {
   return insertThroughCache('fund_daily_state',data)
 }
@@ -83,6 +98,7 @@ function updateFundList() {
 module.exports = {
   selectFundList,
   insertFundList,
+  selectDailyValue,
   insertDailyState,
   flushInsertCache,
   updateFundList,
