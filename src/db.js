@@ -67,6 +67,14 @@ function flushInsertCache() {
   })
 }
 
+function selectRegularInvest() {
+
+}
+
+function insertRegularInvest(data) {
+  return db.insert('regular_invest', data)
+}
+
 function updateFundList() {
   // const sqlStr = 'UPDATE ?? t1 SET ?? = (SELECT MAX(t2.??) FROM ?? t2 WHERE t1.?? = t2.??)'
   const sqlStr = 'update ?? t1, '
@@ -100,6 +108,8 @@ module.exports = {
   insertFundList,
   selectDailyValue,
   insertDailyState,
+  selectRegularInvest,
+  insertRegularInvest,
   flushInsertCache,
   updateFundList,
 }

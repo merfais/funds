@@ -126,7 +126,7 @@ function insert(tableName, data) {
       return acc
     }, {})).sort()
     const fieldsHolder = _.fill(Array(fields.length), '??').join()
-    const valuesHolder = _.fill(Array(fields.length), '?').join()
+    // const valuesHolder = _.fill(Array(fields.length), '?').join()
     sqlStr += '(' + fieldsHolder + ') values ?'
     const values = _.map(data, obj => {
       return _.map(fields, field => obj[field])
