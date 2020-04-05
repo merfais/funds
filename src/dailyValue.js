@@ -92,6 +92,7 @@ function getFundDailyValue(params, errorList, retryTimes) {
           redemption: item.SHZT || '',
           purchase: item.SGZT || '',
           raw_state: 0,
+          increase_rate_raw_state: 0,
         }
         if ((!item.DWJZ && item.DWJZ !== 0)
           || (!item.LJJZ && item.LJJZ !== 0)
