@@ -12,7 +12,7 @@ const {
   logger,
   time,
   db,
-} = require('./utils')
+} = require('../utils')
 
 
 

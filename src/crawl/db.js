@@ -2,7 +2,7 @@ const _ = require('lodash')
 const {
   db,
   logger,
-} = require('./utils')
+} = require('../utils')
 
 
 // 取数据库中基金列表

@@ -12,7 +12,7 @@ const {
   logger,
   time,
   db,
-} = require('./utils')
+} = require('../utils')
 
 
 let codeIndex = 0
@@ -247,7 +247,9 @@ function run() {
   })
 }
 
-run()
+module.exports = {
+  run,
+}
 
 
 

@@ -1,7 +1,3 @@
-const {
-  fetchFundData,
-} = require('./fundInfo')
+const { run } = require('./dingtou')
 
-// require('easy-monitor')('你的项目名称');
-
-fetchFundData()
+run()

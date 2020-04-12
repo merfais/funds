@@ -3,9 +3,9 @@ const path = require('path')
 const datefns = require('date-fns')
 const {
   appendFile,
-} = require('./utils')
+} = require('../utils')
 
-const dir = path.resolve(__dirname, '../exceptions')
+const dir = path.resolve(__dirname, '../../exceptions')
 fs.mkdirSync(dir, { recursive: true })
 
 function saveFundDailyState(data) {

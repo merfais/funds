@@ -2,12 +2,12 @@ const _ = require('lodash')
 const chalk = require('chalk')
 const {
   insertFundList,
-} = require('./db')
+} = require('../db')
 const {
   requestQ,
   request,
   logger,
-} = require('./utils')
+} = require('../utils')
 const {
   genFundDetailOptions,
 } = require('./options')

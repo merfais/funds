@@ -5,12 +5,12 @@ const datefns = require('date-fns')
 const {
   insertDailyState,
   flushInsertCache,
-} = require('./db')
+} = require('../db')
 const {
   requestQ,
   request,
   logger,
-} = require('./utils')
+} = require('../utils')
 const {
   genFundDailyValueOptions,
 } = require('./options')
