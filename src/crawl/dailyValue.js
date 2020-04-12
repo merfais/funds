@@ -5,7 +5,9 @@ const datefns = require('date-fns')
 const {
   insertDailyState,
   flushInsertCache,
-} = require('../db')
+  setFundStartAt,
+  close,
+} = require('./db')
 const {
   requestQ,
   request,
@@ -157,7 +159,13 @@ function getFundDailyValueMulti(arr) {
       && state.requestFundDetailCount <= 0
       && state.requestFundListOver
     ) {
-      flushInsertCache()
+      flushInsertCache().then(() => {
+        return setFundStartAt()
+      }).catch(err => {
+        logger.error('写入数据库出现错误', err)
+      }).then(() => {
+        close()
+      })
     }
     if (errors.length) {
       logger.error(sid, '批量请求基金每日净值错误汇总：')

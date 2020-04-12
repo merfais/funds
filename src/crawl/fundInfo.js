@@ -5,7 +5,7 @@ const {
   selectFundList,
   flushCache,
   updateFundList,
-} = require('../db')
+} = require('./db')
 const {
   requestQ,
   request,

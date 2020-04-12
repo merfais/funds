@@ -57,14 +57,26 @@ function insertDailyState(data) {
   return insertThroughCache('fund_daily_state',data)
 }
 
+function setFundStartAt() {
+  const startAt = `
+    update fund_info t1,
+      (SELECT code, min(date) date from fund_daily_state GROUP BY code) t2
+    set t1.start_at = t2.date
+    WHERE t1.code = t2.code
+  `
+  return db.query(startAt, 'fund_info', 'update')
+}
+
 function flushInsertCache() {
   logger.info('清空cache写入数据库')
-  _.forEach(cache, (data, table) => {
+  return Promise.all(_.map(cache, (data, table) => {
+    let r = Promise.resolve()
     if (data.length) {
-      db.insert(table, data)
+      r = db.insert(table, data)
       cache[table] = []
     }
-  })
+    return r
+  }))
 }
 
 function selectRegularInvest() {
@@ -103,6 +115,10 @@ function updateFundList() {
   })
 }
 
+function close() {
+  db.end()
+}
+
 module.exports = {
   selectFundList,
   insertFundList,
@@ -110,6 +126,8 @@ module.exports = {
   insertDailyState,
   selectRegularInvest,
   insertRegularInvest,
+  setFundStartAt,
   flushInsertCache,
   updateFundList,
+  close,
 }
