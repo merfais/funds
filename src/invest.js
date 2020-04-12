@@ -2,36 +2,48 @@ const _ = require('lodash')
 const chalk = require('chalk')
 const moment = require('moment')
 const {
+  insertRegularInvest,
+} = require('./db')
+const {
   logger,
+  time,
 } = require('./utils')
 
 
 
 /*
- * 获取开市的投资日期
+ * 获取可买入的投资日期
  * 定投日期可能遇到周末或节假日，
  * 此时会推迟到下一个开市日期,
  * 最多向后寻找一个迭代周期
  */
 function getInvestDay(code, date, map, cycle = 'M') {
-  const dateStr = date.format('YYYY-MM-DD')
-  let item = map[dateStr]  // 获取当日
-  const max = date.clone().add(1, cycle)
-  while(!item && date.isBefore(max)) {  // 如果当日不存在数据
-    date.add(1, 'd')   // 按天向后推迟，直到有数据
-    item = map[date.format('YYYY-MM-DD')]
+  let item = map[date]  // 获取当日
+  // 寻找最大日期是一个周期
+  const max = time.add(date, 1, cycle)
+  let next = date
+  // 如果date当日不存在数据，且date小于一个周期
+  while(!item && time.isBefore(next, max)) {
+    next = time.add(next, 1, 'd')   // 按天向后推迟，直到有数据
+    item = map[next]
   }
   if (!item) {
-    logger.error(`${code} 未能寻找到 ${dateStr} 的定投日,`
-      + ` 已寻找到${date.format('YYYY-MM-DD')}`
+    logger.error(
+      `${code} 已寻找到${next}, 未能寻找到 ${date} 的定投日,`
       + `map.keys = ${Object.keys(map)}`
     )
+    item = {
+      date: time.findValidForward(date),
+      raw_state: -1,
+    }
   }
   return item
 }
 
-function genInvestItem(code, date, map) {
-  const item = getInvestDay(code, date.clone(), map) || {}
+// 生成code在start这天买入基金，增加的份额
+// start这天如果不能买入，则向后推迟一个周期，尝试买入
+function genInvestItem(code, start, map, cycle = 'M') {
+  const item = getInvestDay(code, start, map, cycle) || {}
   let shares = 0
   if (item.raw_state === 0) {
     if (/开放/.test(item.purchase)) { // 开放申购
@@ -40,11 +52,11 @@ function genInvestItem(code, date, map) {
   } else {
     logger.error(`${code}净值数据异常`, item)
   }
-  const start = date.format('YYYY-MM-DD')
   return {
-    date: item.date,
-    start,
+    start,  // 计划定投的日期，当天不一定能定投
+    end: item.date,  // 实际发生定投的日期
     shares,           // 增加的份额
+    value: item.value, // 当天的净值
   }
 }
 
@@ -52,16 +64,15 @@ function genInvestItem(code, date, map) {
  * 计算分红和拆分
  */
 function calcBonus(code, bonusList, currentItem, preItem) {
-  let cashBonus = 0         // 现金分红
+  let cashBonus = preItem.cashBonus         // 现金分红
   let increaseShares = 0    // 分红再投资增加的份额
   let preShares = preItem.shares  // 上个定投日的份额
   let preBonusShares = preItem.bonusShares  // 上个定投日分红再投资增加的份额
   _.forEach(bonusList, bonusItem => {
     // 分红日期大于上一个定投日且小于等于当前定投日，
     // 此次分红计算到收益中
-    const bonusDate = moment(bonusItem.date)
-    if (bonusDate.isAfter(preItem.end)
-      && bonusDate.isSameOrBefore(currentItem.start)
+    if (time.isAfter(bonusItem.date, preItem.end)
+      && time.isSameOrBefore(bonusItem.date, currentItem.end)
     ) {
       if (/派现金/.test(bonusItem.bonus_des)) {   // 分红
         // 现金分红 = 上个定投日的份额 * 单位分红
@@ -108,32 +119,61 @@ function calcBonus(code, bonusList, currentItem, preItem) {
  * 直到第n个周期的定投日小于此基金的起始日期
  *
  */
-
-function invest({ code, start, end, map, bonusList }, cpIndex) {
-  logger.info(`子进程 ${cpIndex} 开始计算定投数据`)
+function invest({
+  code,
+  start,
+  end,
+  map,
+  bonusList,
+  cycle,
+  minCycle = 10,
+  maxCycle,
+}, cpIndex) {
+  maxCycle = maxCycle || minCycle
   const investList = []    // 存储定投日的净值信息
-  let date = moment(start).clone()
+  let nextStart = start
+  let sharesCount = 0
   do {
-    const investItem = genInvestItem(code, date.clone(), map)
-    investList.push(investItem)
-    date.add(1, 'M')
-  } while(date.isSameOrBefore(end))
+    const item = genInvestItem(code, nextStart, map, cycle)
+    if (item.shares) {
+      sharesCount += 1
+    }
+    investList.push(item)
+    nextStart = time.add(nextStart, 1, cycle)
+  } while(time.isSameOrBefore(nextStart, end))
   let all = []
-  // 大于等于发行日期，一直向前累计定投期数
-  while(investList.length) {
+  // 可定投的次数小于最小周期的六分之五，放弃
+  if (sharesCount < Math.ceil(minCycle * 5 / 6)) {
+    return all
+  }
+  // 循环定投日净值列表，直到小于最小投资周期
+  while(investList.length > minCycle) {
     const investItem = investList.shift()
+    const nextItem = investList[0] || investItem
+    let referValue = 0
+    if (nextItem && nextItem.value) {
+      referValue = investItem.shares * nextItem.value
+    }
     const list = [{
       code,
       start: investItem.start,
-      end: investItem.start,
+      end: investItem.end,
+      referValue,       // 持有份额参考收益，当前的份额 * 下一个交易日的单位净值
+      referBonusValue: 0, // 分红再投资增加的份额参考收益，当前的份额 * 下一个交易日的单位净值
       shares: investItem.shares,   // 增加的份额
       bonusShares: 0,   // 分红再投资增加的份额
       cashBonus: 0,     // 现金分红
       purchaseCount: investItem.shares ? 1 : 0, // 投入次数，定投日可能会买入失败
       regularCount: 1,  // 定投期数
+      v1: 0,   // （参考收益 - 定投次数）/ 定投次数
+      v2: 0,
+      v3: 0,
     }]
     // 循环定投日净值列表，list中当前项=前一项+定投日数据
     _.forEach(investList, (currentItem, index) => {
+      if (index >= maxCycle) {
+        return false
+      }
       const preItem = list[index]
       const {
         cashBonus,
@@ -141,101 +181,100 @@ function invest({ code, start, end, map, bonusList }, cpIndex) {
         preBonusShares,
         preShares,
       } = calcBonus(code, bonusList, currentItem, preItem)
+      const shares = preShares + currentItem.shares
+      const bonusShares = preBonusShares + increaseShares
+      const purchaseCount = (currentItem.shares ? 1 : 0) + preItem.purchaseCount
+      const nextItem = investList[index + 1] || currentItem
+      let referValue = 0
+      let referBonusValue = 0
+      if (nextItem && nextItem.value) {
+        referValue = shares * nextItem.value
+        referBonusValue = bonusShares * nextItem.value
+      }
+      let v1 = 0
+      let v2 = 0
+      let v3 = 0
+      if (purchaseCount) {
+        v1 = (referValue - purchaseCount) / purchaseCount
+        v2 = (referValue + referBonusValue - purchaseCount) / purchaseCount
+        v3 = (referValue + cashBonus - purchaseCount) / purchaseCount
+      }
       const item = {
         code,
         start: investItem.start,
-        end: currentItem.start,
-        shares: preShares + currentItem.shares,
-        bonusShares: preBonusShares + increaseShares,
+        end: currentItem.end,
+        referValue,
+        referBonusValue,
+        shares,
+        bonusShares,
         cashBonus,
-        purchaseCount: (currentItem.shares ? 1 : 0) + preItem.purchaseCount,
+        purchaseCount,
         regularCount: preItem.regularCount + 1,
+        v1,
+        v2,
+        v3,
       }
       list.push(item)
     })
-    all = all.concat(list)
+    all = all.concat(list.slice(minCycle - 1, maxCycle - 1))
   }
-  logger.info(`子进程 ${cpIndex} 计算定投数据结束, [${code}][${start}]数据长度`, all.length)
-  send(all)
+  // send(all)
+  return all
+}
+
+
+function insertDb(list) {
+
 }
 
 let index
+let pending = new Set()
 
 function send(data) {
-  logger.info(`>>> 子进程 ${index} 发送消息给主进程`)
-  process.send({ data, index })
-  logger.log(`子进程 ${index} 发送消息给主进程 <<<`)
+  if (!data.length) {
+    process.send({ index })
+  } else {
+    insertRegularInvest(data).catch(() => {}).then(() => {
+      process.send({ index })
+    })
+  }
+  // if (pending.size > 20) {
+  //   logger.info(`${index} 号进程等待数据库写入操作达到 20 个`)
+  //   Promise.all([...pending]).then(() => {
+  //     let h = Promise.resolve()
+  //     if (data && data.length) {
+  //       h = insertRegularInvest(data).catch(() => {
+  //       }).then(() => {
+  //         pending.delete(h)
+  //       })
+  //       pending.add(h)
+  //     }
+  //     process.send({ index })
+  //   })
+  // } else {
+  //   let h = Promise.resolve()
+  //   if (data && data.length) {
+  //     h = insertRegularInvest(data).catch(() => {
+  //     }).then(() => {
+  //       pending.delete(h)
+  //     })
+  //     pending.add(h)
+  //   }
+  //   process.send({ index })
+  // }
 }
 
 process.on('message', msg => {
   index = msg.index
-  invest(msg.data, msg.index)
+  let start = ''
+  let code = new Set()
+  const list = _.reduce(msg.data, (acc, item) => {
+    code.add(item.code)
+    start += item.start + '|'
+    acc = acc.concat(invest(item))
+    return acc
+  }, [])
+  logger.info(`子进程 ${msg.index} 计算定投数据结束, ${[...code].join()} [${start}]数据长度`, list.length)
+  send(list)
 })
 
-
-
-
-/*
-function invest(code, investStart, investEnd, map, bonusList) {
-  investEnd = moment(investEnd)
-  const year = investEnd.get('year')
-  const month = investEnd.get('month') + 1
-  let i = 1
-  while(i <= 31) {   // 1号 ~ 31号
-    const d = i < 10 ? `0${i}` : i
-    console.log(`${year}-${month}-${d}`)
-    let date = moment(`${year}-${month}-${d}`)
-    i += 1
-    // 无差别1~31循环，会出现大于investEnd的日期，
-    // 出现后则向前减去一个定投周期
-    while (date.isAfter(investEnd)) {
-      date.subtract(1, 'M')
-    }
-    let all = []
-    const investList = []    // 存储定投日的净值信息
-    // 大于等于发行日期，一直向前累计定投期数
-    while(date.isSameOrAfter(investStart)) {
-      const investItem = genInvestItem(date.clone(), map)
-      const list = [{
-        code,
-        start: investItem.start,
-        end: investItem.start,
-        shares: investItem.shares,   // 增加的份额
-        bonusShares: 0,   // 分红再投资增加的份额
-        cashBonus: 0,     // 现金分红
-        purchaseCount: investItem.shares ? 1 : 0, // 投入次数，定投日可能会买入失败
-        regularCount: 1,  // 定投期数
-      }]
-      // 循环定投日净值列表，list中当前项=前一项+定投日数据
-      _.forEach(investList, (currentItem, index) => {
-        const preItem = list[index]
-        const {
-          cashBonus,
-          increaseShares,
-          preBonusShares,
-          preShares,
-        } = calcBonus(bonusList, currentItem, preItem)
-        const item = {
-          code,
-          start: investItem.start,
-          end: currentItem.start,
-          shares: preShares + currentItem.shares,
-          bonusShares: preBonusShares + increaseShares,
-          cashBonus,
-          purchaseCount: (currentItem.shares ? 1 : 0) + preItem.purchaseCount,
-          regularCount: preItem.regularCount + 1,
-        }
-        list.push(item)
-      })
-      logger.log(date.format('YYYY-MM-DD'), list.length)
-      all = all.concat(list)
-      investList.unshift(investItem) // 存储净值数据
-      date.subtract(1, 'M')  // 向前递减定投周期
-    }
-    console.log('------------------', all.length)
-    insertRegularInvest(all)
-    break
-  }
-}
-
-*/
