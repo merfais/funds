@@ -6,8 +6,8 @@ const {
 
 
 // 取数据库中基金列表
-function selectFundList() {
-  return db.select('fund_info', ['code', 'value_updated_at']).then(data => {
+function selectFundList(where) {
+  return db.select('fund_info', ['code', 'value_updated_at'], where).then(data => {
     return data.result
   })
 }
@@ -38,7 +38,7 @@ function insertFundList(data) {
 }
 
 
-function selectDailyValue(code, orderSort) {
+function selectDailyValue(where, orderSort) {
   return db.select('fund_daily_state', [
     'code',
     'date',
@@ -48,7 +48,7 @@ function selectDailyValue(code, orderSort) {
     'redemption',
     'purchase',
     'raw_state',
-  ], { code }, { orderSort }).then(data => {
+  ], where, { orderSort }).then(data => {
     return data.result
   })
 }
@@ -72,7 +72,7 @@ function selectRegularInvest() {
 }
 
 function insertRegularInvest(data) {
-  return db.insert('regular_invest', data)
+  return db.insert('regular_invest_v', data)
 }
 
 function updateFundList() {

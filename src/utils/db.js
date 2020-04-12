@@ -20,7 +20,7 @@ function coreExec(typeName) {
     const sid = Math.random().toString(16).slice(2, 6)
     const prefix = `[${sid}] ${tableName} ${typeName}`
     const queryStr = mysql.format(sqlStr, values)
-    logger.log(`[${sid}]`, queryStr)
+    // logger.log(`[${sid}]`, queryStr)
     const start = Date.now()
     return pool.query(sqlStr, values).then(([ result, fields ]) => {
       const end = Date.now()
@@ -78,11 +78,11 @@ function buildWhere(where) {
         }
       } else if (_.isPlainObject(value)) {
         if (_.has(value, 'operator') && _.has(value, 'value')) { // k: {operator: '', value: ''}
-          if (/(not)? *in/.test(value.operator)) {
+          if (/(not)? *in/.test(value.operator)) { // operator: 'in', 'not in'
             subArr.push(key)
             subArr.push(value.value)
             return `?? ${value.operator} (?)`
-          } else if (/is *(not)?|!=|>|<|>=|<=/.test(value.operator)) {
+          } else if (/is *(not)?|!=|>|<|>=|<=/.test(value.operator)) {  // operator: 'is', 'is not', '!=', '>', '<', '>=', '<='
             subArr.push(key)
             subArr.push(value.value)
             return `?? ${value.operator} ?`
@@ -166,10 +166,15 @@ function select(tableName, fields, where, ext) {
       }).join(',')
     }
   }
+  // logger.info('select str:', sqlStr)
   return exec.select(tableName, sqlStr, dataArr)
 }
 
 function insert(tableName, data) {
+  if (_.isEmpty(data)) {
+    logger.warn(`${tableName} insert empty data`)
+    return Promise.resolve()
+  }
   let sqlStr = 'insert into ?? '
   let dataArr = [tableName]
   if (data.length === 1) {
@@ -197,6 +202,10 @@ function insert(tableName, data) {
  * where: {k:v, k:v} | [{k:v}, {k:v}]
  */
 function update(tableName, data, where) {
+  if (_.isEmpty(data)) {
+    logger.warn(`${tableName} update empty data`)
+    return Promise.resolve()
+  }
   let sqlStr = 'update ?? set ?'
   let dataArr = [tableName, data]
   const whereRst = buildWhere(where)
