@@ -22,10 +22,19 @@ function getCodeList() {
   logger.info('开始获取codeList')
   return selectFundList({
     calc_ignore: 0,
+    value_updated_at: {
+      '>=': dailyValueDateLimit.date['>='],
+    }
   }).then(list => {
     logger.info('获取codeList结束, list长度=', list.length)
     codeList = _.map(list, item => item.code)
   })
+}
+
+let dailyValueDateLimit = {
+  date: {
+    '>=': '2015-09-01',
+  },
 }
 
 let codeMap = {}
@@ -54,10 +63,6 @@ function getDailyValue() {
   startIndex += step
   return selectDailyValue({
     code,
-    date: {
-      operator: '>=',
-      value: '2015-01-01',
-    },
     redemption: {
       operator: '!=',
       value: '封闭期',
@@ -74,6 +79,7 @@ function getDailyValue() {
       operator: '!=',
       value: '认购期',
     },
+    ...dailyValueDateLimit,
   }, { date: 'asc' }).then(list => {
     logger.info(`获取净值结束, startIndex = ${startIndex}, list长度=`, list.length)
     _.forEach(list, (item) => {
@@ -213,18 +219,18 @@ function send(index) {
     item = {
       ...codeMap[code],
       ...item,
-      minCycle: 24,
-      maxCycle: 30,
+      minCycle,
+      maxCycle,
     }
     return item
   })
   startTimestamp[index] = Date.now()
-  spList[index].send({ data, index})
+  spList[index].send({ data, tableName, index})
   // logger.info(`>>> 发送消息给 ${index} 子进程, code=${code}, start=${data.start}`)
 }
 
 function stop(index) {
-  spList[index].kill(0)
+  spList[index].kill()
   spList[index] = null
   const allKilled = _.reduce(spList, (acc, item) => {
     acc = acc && item === null
@@ -236,7 +242,16 @@ function stop(index) {
   }
 }
 
-function run() {
+let tableName = 'regular_invest_v'
+let minCycle = 24
+let maxCycle = 30
+function run(data) {
+  tableName = data.tableName
+  dailyValueDateLimit = data.limit
+  minCycle = data.minCycle
+  maxCycle = data.maxCycle
+  cycleType = data.cycleType
+
   getCodeList().then(() => {
     return getDailyValue()
   }).then(() => {

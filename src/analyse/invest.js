@@ -3,6 +3,7 @@ const chalk = require('chalk')
 const moment = require('moment')
 const {
   insertRegularInvest,
+  close,
 } = require('./db')
 const {
   logger,
@@ -218,7 +219,6 @@ function invest({
     })
     all = all.concat(list.slice(minCycle - 1, maxCycle - 1))
   }
-  // send(all)
   return all
 }
 
@@ -230,11 +230,11 @@ function insertDb(list) {
 let index
 let pending = new Set()
 
-function send(data) {
+function send(data, tableName) {
   if (!data.length) {
     process.send({ index })
   } else {
-    insertRegularInvest(data).catch(() => {}).then(() => {
+    insertRegularInvest(tableName, data).catch(() => {}).then(() => {
       process.send({ index })
     })
   }
@@ -275,6 +275,11 @@ process.on('message', msg => {
     return acc
   }, [])
   logger.info(`子进程 ${msg.index} 计算定投数据结束, ${[...code].join()} [${start}]数据长度`, list.length)
-  send(list)
+  send(list, msg.tableName)
+})
+
+
+process.on('SIGTERM', () => {
+  close()
 })
 
