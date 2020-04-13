@@ -4,8 +4,11 @@ const {
   logger,
 } = require('../utils')
 
-function insertRegularInvest(data) {
-  return db.insert('regular_invest_v', data)
+function insertRegularInvest(tableName, data) {
+  if (!tableName) {
+    logger.error('tableName不能是空')
+  }
+  return db.insert(tableName, data)
 }
 
 function selectDailyValue(where, orderSort) {
@@ -30,9 +33,75 @@ function selectFundList(where) {
   })
 }
 
+function selectV(v, {
+  tableName,
+  where,
+  minValue,
+  ext,
+}) {
+  return db.select(tableName, [
+    [v, 'value'],
+    'code',
+    'start',
+    'end',
+    'purchaseCount',
+  ], {
+    code: {
+      operator: 'not in',
+      value: ['003889','003890','003962', '003961']
+    },
+    [v]: {
+      '>': minValue,
+    },
+    ...where,
+  }, {
+    orderSort: {
+      [v]: 'desc',
+    },
+    limit: 5000,
+    ...ext,
+  }).then(data => {
+    return data.result
+  })
+
+}
+
+function selectAvgV(v, {
+  tableName,
+  where,
+}) {
+  return db.select(tableName, [[v, 'value']], where).then(data => {
+    return data.result
+  })
+}
+
+
+// function selectAvgV(v, {
+//   tableName,
+//   where,
+// }) {
+//   const { dataArr, sqlStr } = db.buildWhere(where)
+//   const str = `
+//     SELECT avg(${v}) as avg, code, count(code) as count
+//     from ${tableName}
+//     ${sqlStr}
+//     GROUP BY code
+//   `
+//   return db.query({ queryStr: str, dataArr }).then(data => {
+//     return data.result
+//   })
+// }
+
+function close() {
+  db.end()
+}
+
 
 module.exports = {
-  selectRegularInvest,
+  insertRegularInvest,
   selectDailyValue,
   selectFundList,
+  selectV,
+  selectAvgV,
+  close,
 }

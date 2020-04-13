@@ -26,7 +26,7 @@ function coreExec(typeName) {
       const end = Date.now()
       const cost = ((end - start) / 1000).toFixed(2) + 's'
       if (typeName === 'select') {
-        logger.info(prefix, 'success', cost, result && result.length)
+        // logger.info(prefix, 'success', cost, result && result.length)
         // logger.log(prefix, 'fields', _.map(fields, item => item.name))
         // logger.log(prefix, 'result', _.map(result, item => JSON.stringify(item)))
       } else if (typeName === 'insert') {
@@ -142,7 +142,13 @@ function select(tableName, fields, where, ext) {
     sqlStr += '??'
     fields = [fields]
   } else if (_.isArray(fields)) {
-    sqlStr += _.fill(Array(fields.length), '??').join()
+    sqlStr += _.map(fields, f => {
+      if (_.isArray(f) && f.length === 2) {
+        return '?? as ??'
+      }
+      return '??'
+    }).join(',')
+    fields = _.flatten(fields)
   } else {
     sqlStr += '*'
     fields = []
@@ -153,17 +159,17 @@ function select(tableName, fields, where, ext) {
   const whereRst = buildWhere(where)
   sqlStr += whereRst.sqlStr
   dataArr = dataArr.concat(whereRst.dataArr)
-  if (ext && ext.orderSort) {
-    let orderSort = _.cloneDeep(ext.orderSort)
-    if (_.isPlainObject(orderSort)) {
-      orderSort = [orderSort]
-    }
-    if (_.isArray(ext.orderSort)) {
-      sqlStr += ' order by '
+  if (ext) {
+    if (ext.orderSort) {
+      sqlStr += ' order by'
       sqlStr += _.map(ext.orderSort, (v, k) => {
         dataArr.push(k)
-        return `?? ${v}`
+        return ` ?? ${v}`
       }).join(',')
+    }
+    if (ext.limit) {
+      sqlStr += ' limit ?'
+      dataArr.push(ext.limit)
     }
   }
   // logger.info('select str:', sqlStr)
@@ -216,11 +222,16 @@ function update(tableName, data, where) {
 
 
 function query(queryStr, tableName, typeName) {
+  let dataArr = []
+  if (_.isPlainObject(queryStr)) {
+    dataArr = queryStr.dataArr
+    queryStr = queryStr.queryStr
+  }
   const sid = Math.random().toString(16).slice(2, 6)
   const prefix = `[${sid}] ${tableName} ${typeName}`
   // logger.log(`[${sid}]`, queryStr)
   const start = Date.now()
-  return pool.query(queryStr).then(([ result, fields ]) => {
+  return pool.query(queryStr, dataArr).then(([ result, fields ]) => {
     const end = Date.now()
     const cost = ((end - start) / 1000).toFixed(2) + 's'
     logger.info(prefix, 'success', cost)
@@ -241,4 +252,5 @@ module.exports = {
   insert,
   select,
   end,
+  buildWhere,
 }
