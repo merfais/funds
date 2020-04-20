@@ -92,15 +92,6 @@ function calcAvgRet(list, minCount = 20) {
   }, {})
 }
 
-function appendTotalAvg(map, resList) {
-  _.forEach(resList, item => {
-    map[item.code].avg = Number.parseFloat(item.avg)
-    map[item.code].total = Number.parseInt(item.count)
-    map[item.code].code = item.code
-  })
-  return map
-}
-
 function getTotalAvg({ tableName, where, map, field }) {
   return new Promise(resolve => {
     let l = 0
@@ -154,21 +145,34 @@ function genRetMap({
       map,
       field,
     })
-    // const code = Object.keys(map)
-    // return getAvgRetV({
-    //   tableName,
-    //   where: {
-    //     ...where,
-    //     code,
-    //   },
-    // }).then(res => {
-    //   return appendTotalAvg(map, res)
-    // })
   })
+}
+
+function pickSameFund(...args) {
+  let fmap = args[0]
+  _.forEach(args.slice(1), (imap, index) => {
+    const tmp = {}
+    _.forEach(imap, (item, code) => {
+      if (fmap[code]) {
+        tmp[code] = code
+      }
+    })
+    fmap = tmp
+  })
+  const mapList = args.map(i => ({}))
+  _.forEach(fmap, code => {
+    _.forEach(args, (map, index) => {
+      mapList[index][code] = map[code]
+    })
+  })
+  return mapList
 }
 
 function calc1() {
   const where = {
+    start: {
+      '>=': '2019-05-01',
+    },
     end: {
       '<': '2019-12-12',
     },
@@ -195,21 +199,25 @@ function calc1() {
       minValue,
       field: 'v2',
     }),
-  ]).then(([t1, t2]) => {
-    print(t1, t2, 'r20190501_20200410 cashBonus', 'bonusInvest')
+  ]).then(([cashBonus, bonusInvest]) => {
+    print(cashBonus, bonusInvest, '20190501_20200410 cashBonus', 'bonusInvest')
+    return {
+      cashBonus,
+      bonusInvest,
+    }
   })
 }
 
 function calc2() {
   const where = {
     start: {
-      '>=': '2016-12-01',
+      '>=': '2016-05-01',
     },
     end: {
-      '<=': '2020-02-03',
+      '<=': '2019-12-12',
     },
     purchaseCount: {
-      '>': 20,
+      '>=': 20,
     }
   }
   const minValue = 0.4
@@ -233,15 +241,22 @@ function calc2() {
       minValue,
       field: 'v2',
     }),
-  ]).then(([t1, t2]) => {
-    print(t1, t2, 'regular_invest_v cashBonus', 'bonusInvest')
+  ]).then(([cashBonus, bonusInvest]) => {
+    print(cashBonus, bonusInvest, '20160501_20191212 cashBonus', 'bonusInvest')
+    return { cashBonus, bonusInvest }
   })
 }
 
 Promise.all([
   calc1(),
-  // calc2(),
-]).then(() => {
+  calc2(),
+]).then(([c1, c2]) => {
+  const [t1, t2] = pickSameFund(c1.cashBonus, c2.cashBonus)
+  print(t1, t2, 'cashBonus 20190501_20200410', '             20160501_20191212')
+  const [t3, t4] = pickSameFund(c1.bonusInvest, c2.bonusInvest)
+  print(t3, t4, 'bonusInvest 20190501_20200410', '            20160501_20191212')
+
+}).then(() => {
   close()
 })
 
@@ -252,6 +267,15 @@ Promise.all([
 
 
 
+
+// function appendTotalAvg(map, resList) {
+//   _.forEach(resList, item => {
+//     map[item.code].avg = Number.parseFloat(item.avg)
+//     map[item.code].total = Number.parseInt(item.count)
+//     map[item.code].code = item.code
+//   })
+//   return map
+// }
 
 
 // function cashBonus({
