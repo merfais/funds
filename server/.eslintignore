@@ -1,0 +1,7 @@
+config/*
+coverage/*
+test/*
+tmp/*
+node_modules/*
+dev.js
+package.json
