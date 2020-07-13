@@ -5,18 +5,18 @@ const db = require('../utils/db.js')
 
 const ss = `SELECT b.code code
   from (
-    select code, count(*) c from fund_daily_state where
+    select code, count(*) count from fund_daily_state where
       (redemption = '开放赎回' and purchase = '开放申购')
       or (redemption = '' and purchase = '')
       GROUP BY code
   ) a RIGHT JOIN (
-    SELECT code, count(*) cc from fund_daily_state GROUP BY code
+    SELECT code, count(*) count from fund_daily_state GROUP BY code
   ) b on a.code = b.code
-  WHERE a.c is null   -- 完全不能申购
-  or a.c < 30  -- 能申购的数小于30
-  or ((b.cc - a.c) *  2 > b.cc  and a.c < 200) -- 不能申购数超过一半 且 能申购数小于200
-  or (a.c < 100  and (b.cc - a.c > 10)) -- 能申购数小于100 且 不能申购数大于10
-  or (a.c < 50  and (b.cc - a.c > 0)) -- 能申购数小于100 且 不能申购数大于10
+  WHERE a.count is null   -- 完全不能申购
+  or a.count < 100  -- 能申购的数小于100
+  or ((b.count - a.count) *  2 > b.count  and a.count < 200) -- 不能申购数超过一半 且 能申购数小于200
+  -- or (a.count < 100  and (b.count - a.count > 10)) -- 能申购数小于100 且 不能申购数大于10
+  -- or (a.count < 50  and (b.count - a.count > 0)) -- 能申购数小于50 且 不能申购数大于0
 `
 
 const start = Date.now()
@@ -35,14 +35,14 @@ const start = Date.now()
 // 能申购数小于50 且 不能申购数大于0
 function calc1() {
   const s1 = `
-      select code, count(*) c from fund_daily_state where
+      select code, count(*) count from fund_daily_state where
         (redemption = '开放赎回' and purchase = '开放申购')
         or (redemption = '' and purchase = '')
         GROUP BY code
 
   `
   const s2 = `
-      SELECT code, count(*) cc from fund_daily_state GROUP BY code
+      SELECT code, count(*) count from fund_daily_state GROUP BY code
   `
 
   return Promise.all([
@@ -51,16 +51,16 @@ function calc1() {
   ]).then(([{ result: r1 }, { result: r2 }]) => {
     const map = new Map()
     _.forEach(r1, item => {
-      map.set(item.code, item.c)
+      map.set(item.code, item.count)
     })
     const code = _.reduce(r2, (acc, item) => {
-      const cc = item.cc
-      const c = map.get(item.code) || 0
-      const nc = cc - c
-      if (c < 30                      // 能申购的数小于30,包括不能申购的
-        || (nc * 2 > cc && c < 200)   // 不能申购数超过总数的一半 且 能申购数小于200
-        || (c < 100 && nc > 10)       // 能申购数小于100 且 不能申购数大于10
-        || (c < 50 && nc > 0)         // 能申购数小于50 且 不能申购数大于0
+      const countAll = item.count
+      const count = map.get(item.code) || 0
+      const nc = countAll - count
+      if (count < 100                 // 能申购的数小于100,包括不能申购的
+        || (nc * 2 > countAll && count < 200)   // 不能申购数超过总数的一半 且 能申购数小于200
+        // || (count < 100 && nc > 10)       // 能申购数小于100 且 不能申购数大于10
+        // || (count < 50 && nc > 0)         // 能申购数小于50 且 不能申购数大于0
       ) {
         acc.push(item.code)
       }
@@ -82,6 +82,7 @@ function calc2() {
   })
 }
 
+// 没有每日净值的基金
 function calc3() {
   const notExist = `SELECT code from fund_info WHERE code not in (select DISTINCT code from fund_daily_state)`
 
@@ -107,6 +108,7 @@ function calc4() {
     '003793',
     '006471',
   ]
+  return code
 }
 
 function run() {
@@ -114,7 +116,8 @@ function run() {
     return Promise.all([
       calc1(),
       calc2(),
-      calc3()
+      calc3(),
+      calc4(),
     ]).then(res => {
       return [...new Set(_.reduce(res, (acc, item) => {
         acc = acc.concat(item)

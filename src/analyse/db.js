@@ -76,21 +76,27 @@ function selectAvgV(v, {
 }
 
 
-// function selectAvgV(v, {
-//   tableName,
-//   where,
-// }) {
-//   const { dataArr, sqlStr } = db.buildWhere(where)
-//   const str = `
-//     SELECT avg(${v}) as avg, code, count(code) as count
-//     from ${tableName}
-//     ${sqlStr}
-//     GROUP BY code
-//   `
-//   return db.query({ queryStr: str, dataArr }).then(data => {
-//     return data.result
-//   })
-// }
+function selectAllAvgV({
+  tableName,
+  where,
+  minCount,
+  limit,
+}) {
+  const { dataArr, sqlStr } = db.buildWhere(where)
+  const str = `
+    SELECT avg3, avg2, code, count from (
+      SELECT avg(v3) as avg3, avg(v2) as avg2, code, count(code) as count
+      from ${tableName}
+      ${sqlStr}
+      GROUP BY code
+    ) as t
+    where count > ${minCount}
+    ORDER BY avg3 desc limit ${limit}
+  `
+  return db.query({ queryStr: str, dataArr }).then(data => {
+    return data.result
+  })
+}
 
 function close() {
   db.end()
@@ -103,5 +109,6 @@ module.exports = {
   selectFundList,
   selectV,
   selectAvgV,
+  selectAllAvgV,
   close,
 }
