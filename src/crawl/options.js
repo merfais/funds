@@ -50,7 +50,6 @@ function genAllFundOptions(page, size = 200) {
       atfc: '',
       onlySale: '0',        // 是否可购买 1: 可购 0: 全部
     },
-    data: {},
     headers: {
       Referer: 'http://fund.eastmoney.com/fund.html',
       Host: 'fund.eastmoney.com',
@@ -112,7 +111,6 @@ function genFundDetailOptions(key) {
       key,
       _: Date.now()
     },
-    data: {},
     headers: {
       Referer: 'http://fund.eastmoney.com/HH_jzzzl.html',
       Host: 'fundsuggest.eastmoney.com',
@@ -167,7 +165,6 @@ function genFundDailyValueOptions(fundCode, startDate, pageIndex = 1, pageSize =
       endDate: '',
       _: Date.now(),
     },
-    data: {},
     headers: {
       Referer: `http://fundf10.eastmoney.com/jjjz_${fundCode}.html`,
     }

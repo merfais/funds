@@ -78,6 +78,8 @@ function request(options, retryTimes) {
   })
   const method = `[${(options.method || 'GET').toUpperCase()}]`
   // logger.info(options._sid_, method, options.url)
+  // console.log(options)
+  // console.log('==================================')
   return axios.request(options).catch(err => {
     logger.error(options._sid_, '网络请求发生错误:\n', err)
     if (retryTimes === 5) {

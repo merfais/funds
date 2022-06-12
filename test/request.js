@@ -1,3 +1,4 @@
+const axios = require('axios')
 const _ = require('lodash')
 const {
   genFundDailyValueOptions,
@@ -9,6 +10,7 @@ const {
 function test() {
   const options = genFundDailyValueOptions('003446', '2019-11-01', 3, 10)
 
+  console.log(options)
   request(options).then(ack => {
     console.log(ack.data)
     if (ack && ack.data) {
@@ -40,3 +42,26 @@ test()
 // 获取基金列表 7530个，38页
 // 按页获取基金详细信息，7530个请求，100个一页
 // 按页获取基金净值总个数，缓存到内存
+
+
+function testBaidu() {
+  const  options = {
+    method: 'get',
+    baseURL: 'http://www.baidu.com',
+    url: '/',
+    params: {}
+  }
+  axios.request(options).catch(err => {
+    logger.error(options._sid_, '网络请求发生错误:\n', err)
+  }).then(res => {
+    console.log('res')
+  })
+  request(options).catch(err => {
+    console.log('eeeeeeeeeeeeeeeeeeeeeeeee')
+    console.log(err)
+  }).then(res => {
+    console.log(res)
+  })
+}
+
+// testBaidu()
